@@ -8,7 +8,6 @@ This walkthrough details the complete exploitation of `planning.htb`, from enume
 
 Make sure your machine resolves the box correctly:
 
-```bash
 cat /etc/hosts
 If needed, append:
 
