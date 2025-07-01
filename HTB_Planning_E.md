@@ -217,8 +217,8 @@ while True:
 
     threading.Thread(target=forward, args=(client_sock, server_sock)).start()
     threading.Thread(target=forward, args=(server_sock, client_sock)).start()
-Once the script was running, navigate to:
 ```
+Once the script was running, navigate to:
 arduino
 Copy
 Edit
