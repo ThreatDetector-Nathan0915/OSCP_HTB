@@ -1,5 +1,4 @@
 # HTB Planning Walkthrough
-```bash
 # === Host File Setup ===
 # Display the current /etc/hosts file to ensure DNS resolution for planning.htb works properly
 cat /etc/hosts
