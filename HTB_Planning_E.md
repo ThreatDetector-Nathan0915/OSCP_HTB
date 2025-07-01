@@ -181,7 +181,6 @@ After initial enumeration and lateral movement, we achieved root by exploiting t
 
 LinPEAS revealed a sensitive file:
 
-```bash
 cat /opt/crontabs/crontab.db
 It contained:
 
@@ -193,7 +192,7 @@ These credentials were used to authenticate to the internal cron job management 
 
 🔁 Port Forwarding: Accessing Port 8000 Externally
 Since the cron web interface was bound to 127.0.0.1:8000, we used a custom Python script to forward it to our local port 5555:
-
+```
 python
 Copy
 Edit
@@ -219,7 +218,7 @@ while True:
     threading.Thread(target=forward, args=(client_sock, server_sock)).start()
     threading.Thread(target=forward, args=(server_sock, client_sock)).start()
 Once the script was running, navigate to:
-
+```
 arduino
 Copy
 Edit
