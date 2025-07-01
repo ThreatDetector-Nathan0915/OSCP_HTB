@@ -2,7 +2,6 @@
 
 ## Host File Setup
 
-```bash
 # Display the current /etc/hosts file to ensure DNS resolution for planning.htb works properly
 cat /etc/hosts
 
@@ -209,11 +208,3 @@ nc -lvnp 4444
 # You should now have root shell on the host
 whoami
 # Output: root
-Final Notes
-The cron.db file revealed credentials for the cron UI (root/P4ssw0rdS0pRi0T3c).
-
-LinPEAS helped locate the cron job database file.
-
-Port 8000 was locally accessible only; a manual Python proxy was used to expose it on 5555.
-
-Chaining the Grafana RCE with credentials reuse and custom port forwarding enabled full root compromise.
