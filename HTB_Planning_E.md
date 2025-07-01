@@ -172,28 +172,7 @@ lsof -i :8000
 
 # Validate SSH tunnel connections or manually forwarded ports
 ps aux | grep 23357
-```
-## 🧨 Final Root Access via Cron Job Exploitation
-
-After initial enumeration and lateral movement, we achieved root by exploiting the cron job web interface exposed internally.
-
-### 🔍 Credential Discovery
-
-LinPEAS revealed a sensitive file:
-
-```bash
-cat /opt/crontabs/crontab.db
-It contained:
-
-Username: root
-
-Password: P4ssw0rdS0pRi0T3c
-
-These credentials were used to authenticate to the internal cron job management web panel.
-
-🔁 Port Forwarding: Accessing Port 8000 Externally
-Since the cron web interface was bound to 127.0.0.1:8000, we used a custom Python script to forward it to our local port 5555:
-
+Port Forwarding Custom Proxy (8000 to 5555)
 python
 Copy
 Edit
@@ -218,9 +197,7 @@ while True:
 
     threading.Thread(target=forward, args=(client_sock, server_sock)).start()
     threading.Thread(target=forward, args=(server_sock, client_sock)).start()
-Once the script was running, navigate to:
-
-arduino
+bash
 Copy
 Edit
 http://planning.htb:5555
@@ -245,9 +222,12 @@ bash
 Copy
 Edit
 whoami
-# root
-✅ Summary
-Stage	Action	Result
-Discovery	Found credentials in cron.db	root / P4ssw0rdS0pRi0T3c
-Access	Port-forwarded cron UI (9898 → 5555)	Web panel accessible
-Exploitation	Launched reverse shell via cron job	Got root shell
+# Output: root
+Final Notes
+The cron.db file revealed credentials for the cron UI (root/P4ssw0rdS0pRi0T3c).
+
+LinPEAS helped locate the cron job database file.
+
+Port 8000 was locally accessible only; a manual Python proxy was used to expose it on 5555.
+
+Chaining the Grafana RCE with credentials reuse and custom port forwarding enabled full root compromise.
