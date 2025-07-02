@@ -241,7 +241,6 @@ Let me know when the password cracks finish or if you'd like to continue with es
 
 Once the MD5 hash for `martin` was cracked (`nafeelswordsmaster`), SSH access was obtained:
 
-```bash
 ssh martin@10.129.231.240
 ✅ You successfully gained a shell as martin.
 
