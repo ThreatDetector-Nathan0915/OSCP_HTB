@@ -156,10 +156,28 @@ Subdomain brute force:
 for ip in $(cat list.txt); do host $ip.megacorpone.com; done
 ```
 
+Classic Ping Sweep pingsweep enumeration one liner 
+
+```bash
+bash -c 'for ip in 10.4.103.{1..254}; do ping -c1 -W1 $ip &>/dev/null && echo "$ip is up"; done'
+```
+
 Class C ping sweep:
 ```bash
 for ip in $(seq 200 254); do host xx.xx.xx.$ip; done | grep -v "not found"
 ```
+or in parallel
+```bash
+for ip in $(seq 1 254); do (ping -c1 -W1 192.168.1.$ip &>/dev/null && echo "10.4.103.$ip is up") & done; wait
+```
+nc port enumeration no nmap found
+
+bash 
+```
+for port in {1..1000}; do (echo > /dev/tcp/10.10.10.10/$port) >/dev/null 2>&1 && echo "Port $port is open"; done
+
+```
+
 
 Tools:
 ```bash

