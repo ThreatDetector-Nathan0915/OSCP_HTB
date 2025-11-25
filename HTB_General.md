@@ -2,25 +2,15 @@
 ---
 ## Common Ports
 20/21   (TCP)	    FTP File Transfer Protocol, used to move files around
----
 22      (TCP)	    SSH Secure Shell, used to securly connect to and manage hosts
----
 23      (TCP)	    Telnet Same as SSH just not secure at all, used to connect to hosts and manage them just in clear text.
----
 25      (TCP)	    SMTP Simple Mail Tranfer Protocol used to send and recieve mail for mail servers.
----
 80      (TCP)	    HTTP Hypertext Transfer Protocol used to tranfer web content between client and a web server.
----
 161     (TCP/UDP)	SNMP Simple Network Management Protocol used to monitor, manage and configure network devices - pull metrics - network invetory ect.
----
 389     (TCP/UDP)	LDAP Lightweight Directory Access Protocol - used to query directory services, like active directory.
----
 443     (TCP)	    SSL/TLS (HTTPS) Hypertext Transfer Protocol Secure - encypted secure version of HTTP. used for loading websites ect.
----
 445     (TCP)	    SMB Server Message Block network local file sharing, people stand up and SMB drive and others connect to it and pull files.
----
 3389    (TCP)	    RDP Remote Desktop Protocol - Like SSH but has an interactive session that you can interact with the GUI of the host.
----
 
 ### Different Tools
 **SSH** - Can be configered for password or passwordless configuration, with public-key authentication. Uses a client server model. IE the host needs to be running OpenSSH or an SSH server.
