@@ -73,3 +73,13 @@ If you need to do it in the contex of a user the following works but also will p
 ```bash
 smbclient -U bob \\\\10.129.43.253\users
 ```
+---
+#### **Web Eumeration**
+
+**Gobuster** - Versatile tool that can perform DNS, vhost, and directory brute-forcing. Can also enumerate public AWS S3 buckets. 
+Usage - directory bruteforce mode.
+```bash
+gobuster dir -u http://10.10.10.121/ -w /usr/share/seclists/Discovery/Web-Content/common.txt
+```
+Link to http status codes: https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+
