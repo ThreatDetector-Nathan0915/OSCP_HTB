@@ -83,3 +83,31 @@ gobuster dir -u http://10.10.10.121/ -w /usr/share/seclists/Discovery/Web-Conten
 ```
 Link to http status codes: https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
 
+Installation of Seclist
+```bash 
+git clone https://github.com/danielmiessler/SecLists
+sudo apt install seclists -y 
+```
+
+Usage - dns subnet enumeration
+```bash
+gobuster dns -d inlanefreight.com -w /usr/share/SecLists/Discovery/DNS/namelist.txt
+```
+
+**Banner Grabbing** - Banner grabbing on web servers is another enumeration tactic that can reveal specific application frameworks in use. This can be gleaned by using curl.
+Usage -
+```bash
+curl -IL https://www.inlanefreight.com
+```
+
+**Whatweb** - Can be used to extract the version of web servers, supporting frameworks, and applications using the command-line tool.
+Usage - 
+```bash
+whatweb 10.1.10.121
+```
+
+**Certificates** - Certificates are another valuable source of information when https is in use. Looking at the certificates could show the email domain, the company and other phishing based targets.
+
+**Robots.txt** - This instructs the search engine web crawlers, like googlebot which rescource can and cannot be accessed for indexing. 
+
+**Source Code** - The source code of a site might have mistakes by a developer leaving comments in the code for a test account ect.
