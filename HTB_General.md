@@ -1,6 +1,7 @@
 # General Notes from the HTB Pentration tester path.
 ---
 # Common Ports
+```
 20/21   (TCP)	    FTP File Transfer Protocol, used to move files around
 22      (TCP)	    SSH Secure Shell, used to securly connect to and manage hosts
 23      (TCP)	    Telnet Same as SSH just not secure at all, used to connect to hosts and manage them just in clear text.
@@ -11,6 +12,7 @@
 443     (TCP)	    SSL/TLS (HTTPS) Hypertext Transfer Protocol Secure - encypted secure version of HTTP. used for loading websites ect.
 445     (TCP)	    SMB Server Message Block network local file sharing, people stand up and SMB drive and others connect to it and pull files.
 3389    (TCP)	    RDP Remote Desktop Protocol - Like SSH but has an interactive session that you can interact with the GUI of the host.
+```
 
 ---
 
