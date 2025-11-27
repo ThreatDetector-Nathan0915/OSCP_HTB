@@ -253,3 +253,34 @@ curl http://SERVER_IP:PORT/shell.php?cmd=id
 ```bash
 ip a
 ```
+
+---
+
+# Privilege Escalation
+**Helpfull Links**
+When landing on a host, typically we have a lower privileged shell, to esclate privs on windows we want to get the System account on linux the target is Root. Some really great places to start are:
+```
+HackTricks: https://book.hacktricks.xyz/
+PayloadsAllTheThings: https://github.com/swisskyrepo/PayloadsAllTheThings
+GTFO Bins: https://gtfobins.github.io/
+LOLBAS: https://lolbas-project.github.io/#
+```
+**Host Enumeration**
+There are also enumeration scripts that can aid in identifying vulnerabilities on a host. They will run through a list of predfined commands and places to look, and return results. Common Enumeration Scripts Include:
+```
+Linux:
+https://github.com/rebootuser/LinEnum.git
+https://github.com/sleventyeleven/linuxprivchecker
+
+Windows:
+https://github.com/411Hall/JAWS
+https://github.com/GhostPack/Seatbelt
+
+Windows/Linux:
+https://github.com/carlospolop/privilege-escalation-awesome-scripts-suite
+```
+**Kernel Exploits**
+Hosts running on outdated operating systems typically will be vulnerable to kernel exploitation, which can be taken advatage of through tools like searchsploit.
+
+**Vulnerable Software**
+Vulnerable software versions can also be leveraged 
