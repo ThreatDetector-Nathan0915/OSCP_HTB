@@ -31,6 +31,7 @@ nc 10.10.10.10 22
 **Tmux** - Used for multiboxing terminals, ctr + b opens a new terminal, and we can swtich between them with 0, 1 ect. Shift + " will split them horizontally, and Shift + % will split them vertically. Also can switch between the windows with up down left or right keypad arrows.
 
 **VIM** - a text editor.. to edit file hit i (insert mode) 
+```
 Command	Description
 x	    Cut character
 dw	    Cut word
@@ -43,15 +44,15 @@ p	    Paste
 :q	    Quit
 :q!	    Quit without saving
 :wq	    Write and quit
+```
 
-**Ports** - range from 1 to 65,535 well known ports are 1 through 1023, port 0 is treted as a wild card port.
+**Ports** - range from 1 to 65,535 well known ports are 1 through 1023, port 0 is treated as a wild card port.
 
 **NMAP** - Used to scan hosts in a subnet and enumerate services operating on ports. Just doing --
 ```bash
 namp <target_ip>
 ```
-will run a quick scan against the 1000 most common ports returning the state, service, port, ect. We can use the -sC parameter to define nmap common/default scripts usage. the -sV flag will identify the service and version from the scan. -p- will tell nmap to scan all 1-65,000 ports (all ports) this will take alot longer than just a standard scan.
-    NMAP scripts in general can extend the utility of NMAP notably. To find them we can run
+This will run a quick scan against the 1000 most common ports returning the state, service, port, ect. We can use the -sC parameter to define nmap common/default scripts usage. the -sV flag will identify the service and version from the scan. -p- will tell nmap to scan all 1-65,000 ports (all ports) this will take alot longer than just a standard scan. NMAP scripts in general can extend the utility of NMAP notably. To find them we can run:
 ```bash
 locate scripts/<script_you_want>
 ```
@@ -60,7 +61,7 @@ nmap --script <script_name> -p<ports> <host>
 ```
 
 **FTP** - File transfer protocol can be used to pull files from a host if left open with anonymous login allowed.
-usage
+Usage:
 ```bash
 ftp -p 10.129.42.253
 get login.txt
@@ -69,7 +70,7 @@ get login.txt
 ```bash
 smbclient -N -L \\\\10.129.53.353
 ```
-that will also list the users and the shares they are a part of. To target a users share run.
+This will also list the users and the shares they are a part of. To target a specific users share run:
 ```bash 
 smbclient \\\\10.129.42.253\\users
 ```
