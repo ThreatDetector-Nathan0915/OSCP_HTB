@@ -1,6 +1,6 @@
-# Just General Notes from the Pentration tester path. Note dump really.
+# General Notes from the HTB Pentration tester path.
 ---
-## Common Ports
+# Common Ports
 20/21   (TCP)	    FTP File Transfer Protocol, used to move files around
 22      (TCP)	    SSH Secure Shell, used to securly connect to and manage hosts
 23      (TCP)	    Telnet Same as SSH just not secure at all, used to connect to hosts and manage them just in clear text.
@@ -12,7 +12,9 @@
 445     (TCP)	    SMB Server Message Block network local file sharing, people stand up and SMB drive and others connect to it and pull files.
 3389    (TCP)	    RDP Remote Desktop Protocol - Like SSH but has an interactive session that you can interact with the GUI of the host.
 
-### Different Tools
+---
+
+# Different Tools
 **SSH** - Can be configered for password or passwordless configuration, with public-key authentication. Uses a client server model. IE the host needs to be running OpenSSH or an SSH server.
 Usage 
 ```bash
@@ -73,8 +75,10 @@ If you need to do it in the contex of a user the following works but also will p
 ```bash
 smbclient -U bob \\\\10.129.43.253\users
 ```
+
 ---
-#### Web Eumeration
+
+# Web Eumeration
 
 **Gobuster** - Versatile tool that can perform DNS, vhost, and directory brute-forcing. Can also enumerate public AWS S3 buckets. 
 Usage - directory bruteforce mode.
@@ -111,7 +115,10 @@ whatweb 10.1.10.121
 **Robots.txt** - This instructs the search engine web crawlers, like googlebot which rescource can and cannot be accessed for indexing. 
 
 **Source Code** - The source code of a site might have mistakes by a developer leaving comments in the code for a test account ect.
-##### Public Exploits
+
+---
+
+# Public Exploits
 Once services have been identified via NMAP scan, we want to ensure wether or not they have public exploits available. First off just google the service version and exploit is the lowest hanging fruit. Other exploit sites are **Exploit DB**, **Rapid7 DB**, or **vulnerability lab**.
 
 **searchsploit** - can be used to find exploits via bash shell. 
@@ -139,7 +146,9 @@ getuid (check privs)
 shell (get interactive shell)
 ```
 
-###### Types of Shells
+---
+
+# Types of Shells
 **Reverse Shell** - Sends a shell from a target host back to a listener port on the local host. Easy reliable.
 Types(call back):
 **Bash**
