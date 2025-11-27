@@ -218,7 +218,8 @@ Web Server - Nginx
 /usr/local/nginx/html/
 ```
 Web Server - IIS
-```c:\inetpub\wwwroot\
+```
+c:\inetpub\wwwroot\
 
 ```
 Web Server - XAMPP
