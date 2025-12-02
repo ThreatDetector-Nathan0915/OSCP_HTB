@@ -561,3 +561,10 @@ Decoy scans + aggressive timeout may trigger low-level packet bugs or issues wit
 | `-p <ports>` | Target specific services (FTP, SSH, HTTP, etc.) |
 
 🎯 You're now fully equipped to extract **flags**, identify **filtered/closed/open ports**, and bypass **light firewalls** like a boss. 💪
+
+# Final module
+The final module has us conduct an nmap scan on a target that is leveraging and IDS/IPS to filter traffic inbound to a host. That being said we can use nmap to perform a stealthy scan with a delay to prevent being blocked. After enumerating the services we can use banner grabbing to pull the version via nc.
+```bash
+sudo nmap -sS -sV -Pn -n --source-port 53 --scan-delay 200ms --max-rate 30 --version-intensity 1 10.129.73.113
+sudo ncat -nv --source-port 53 10.129.73.113 50000
+```
