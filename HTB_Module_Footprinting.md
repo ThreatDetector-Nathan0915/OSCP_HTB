@@ -57,3 +57,30 @@ netname: sambashare
         password:
 rpcclient $> exit
 ```
+
+# nfs
+
+``bash                                                                                                                     
+┌──(kali㉿kali)-[~]
+└─$ sudo nmap --script nfs* 10.129.202.5 -sV -p111,2049
+```
+
+```bash
+─$ showmount -e 10.129.202.5                          
+Export list for 10.129.202.5:
+/var/nfs      10.0.0.0/8
+/mnt/nfsshare 10.0.0.0/8
+```
+
+```bash 
+┌──(kali㉿kali)-[~]
+└─$ sudo mount -t nfs 10.129.202.5:/var/nfs ./target -o nolock                                                                               
+┌──(kali㉿kali)-[~]
+└─$ sudo mount -t nfs 10.129.202.5:/mnt/nfsshare ./target -o nolock                                                                                                                                            
+┌──(kali㉿kali)-[~]
+└─$ cd target                                                                                                                                   
+┌──(kali㉿kali)-[~/target]
+└─$ tree .
+└── flag.txt
+1 directory, 1 file
+```
