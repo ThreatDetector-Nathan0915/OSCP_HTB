@@ -84,3 +84,12 @@ Export list for 10.129.202.5:
 └── flag.txt
 1 directory, 1 file
 ```
+
+
+dnsrecon -d inlanefreight.htb -n 10.129.203.75 -D /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt -t brt
+
+
+└─$ dig @10.129.203.75 internal.inlanefreight.htb AXFR
+└─$ dig axfr internal.inlanefreight.htb @10.129.203.75
+
+└─$ gobuster dns -d inlanefreight.htb -r 10.129.203.75 -w /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-5000.txt 
