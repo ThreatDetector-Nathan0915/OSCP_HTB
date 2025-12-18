@@ -93,3 +93,66 @@ dnsrecon -d inlanefreight.htb -n 10.129.203.75 -D /home/kali/SecLists-master/Dis
 └─$ dig axfr internal.inlanefreight.htb @10.129.203.75
 
 └─$ gobuster dns -d inlanefreight.htb -r 10.129.203.75 -w /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-5000.txt 
+
+amass enum -d inlanefreight.htb -brute -recursive -w dns-Jhaddix.txt
+
+
+**SMTP**
+The SMTP Footprinting module focuses on understanding how SMTP works, how it is commonly deployed, and how misconfigurations can leak valuable information during enumeration. SMTP is primarily used for sending email and typically runs on port 25, with newer authenticated submissions occurring on ports 587 or 465 using STARTTLS for encryption. By default, SMTP transmits data in plaintext, which makes it an attractive target during reconnaissance.
+
+A key takeaway is that SMTP servers can unintentionally disclose valid system users through commands such as VRFY and EXPN. Depending on server configuration, response codes like 252 may indicate that a mailbox exists, while 550 confirms a user does not exist. However, the module emphasizes that enumeration results should never be blindly trusted, as some servers are configured to return misleading responses. Manual verification and contextual analysis are critical.
+
+The module also highlights the danger of open relay configurations, which allow unauthenticated users to send email through the server. Misconfigured relay settings can enable spam campaigns, spoofed emails, and information leakage. Tools such as telnet, netcat, and Nmap SMTP NSE scripts are used to identify supported commands, authentication mechanisms, and relay behavior.
+
+Overall, the module teaches how SMTP misconfigurations can expose internal usernames, employee accounts, and infrastructure details, making SMTP a valuable early foothold during penetration testing and internal network assessments.
+
+**Key Commands to run on SMTP**
+```
+Command	Usage	Description
+HELO	HELO <hostname>	Initiates the SMTP session and identifies the client to the server.
+EHLO	EHLO <hostname>	Extended HELO; lists supported ESMTP features (AUTH, STARTTLS, SIZE, etc.).
+MAIL FROM	MAIL FROM:<address>	Specifies the sender’s email address for the message.
+RCPT TO	RCPT TO:<address>	Specifies the recipient’s email address; may be used for user enumeration.
+DATA	DATA	Begins the email body; message ends with a single period (.) on its own line.
+VRFY	VRFY <username>	Verifies whether a mailbox or local user exists on the server.
+EXPN	EXPN <mailing-list>	Expands a mailing list into individual recipient addresses.
+AUTH	AUTH LOGIN / AUTH PLAIN	Initiates SMTP authentication using encoded credentials.
+STARTTLS	STARTTLS	Upgrades an unencrypted SMTP connection to TLS encryption.
+RSET	RSET	Resets the current mail transaction without closing the connection.
+NOOP	NOOP	Sends a keep-alive request to prevent session timeout.
+QUIT	QUIT	Terminates the SMTP session gracefully.
+HELP	HELP	Requests a list of supported SMTP commands (often disabled).
+```
+**Typical responces**
+```
+🔑 Key Response Codes (Quick Reference)
+Code	Meaning
+250	Requested action completed successfully
+252	User exists but verification is restricted
+354	Server ready to receive message data
+550	Mailbox does not exist / access denied
+503	Bad command sequence
+502	Command not implemented\
+```
+
+**Banner Grab SMTP version**
+```bash
+nc -nv 10.10.10.10 25
+```
+
+**Enumerate port 25 SMTP**
+```bash
+sudo nmap 10.129.218.123 -p25 --script smtp-open-relay -v
+```
+
+**Connect to SMTP server via 25 and telnet can run commands to enumerate**
+```bash
+telnet 10.129.218.123 25
+```
+**While loop to enumerate usernames that are present on the host**
+```bash
+ while read user; do               
+  printf "VRFY %s\r\nQUIT\r\n" "$user" | nc -nv 10.129.218.123 25 | \
+  grep -E "550|250|252" | sed "s/^/$user -> /"
+done < /home/kali/SecLists-master/Usernames/top-usernames-shortlist.txt
+```
