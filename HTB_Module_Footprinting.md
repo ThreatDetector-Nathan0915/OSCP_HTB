@@ -156,3 +156,153 @@ telnet 10.129.218.123 25
   grep -E "550|250|252" | sed "s/^/$user -> /"
 done < /home/kali/SecLists-master/Usernames/top-usernames-shortlist.txt
 ```
+
+# HTB Mail Enumeration + IMAP Email Flag Retrieval — Full End-to-End Summary
+
+## Objective
+Enumerate mail services on `10.129.1.2`, authenticate with IMAP using `robin:robin`, locate internal mailboxes, read the stored email, and extract the **flag contained in the email body**.
+
+---
+
+## 1. Initial Service Discovery
+Nmap revealed mail services running on the target:
+
+- **110/tcp** → POP3 (`Dovecot pop3d`)
+- **993/tcp** → IMAPS (IMAP over TLS)
+- **995/tcp** → POP3S (POP3 over TLS)
+
+POP3 capabilities included:
+`CAPA PIPELINING STLS UIDL RESP-CODES SASL TOP AUTH-RESP-CODE`
+
+TLS certificate enumeration showed:
+- `CN=dev.inlanefreight.htb`
+- `emailAddress=cto.dev@dev.inlanefreight.htb`
+- Self-signed certificate with long validity
+
+This confirmed an internal mail infrastructure using the `inlanefreight.htb` domain.
+
+---
+
+## 2. IMAPS Enumeration with curl (Banner + Auth Validation)
+You connected to IMAPS using curl:
+
+```bash
+curl -k imaps://10.129.1.2 --user robin:robin -v
+```
+Results:
+
+TLS handshake succeeded
+
+Authentication succeeded
+
+IMAP server greeting banner displayed a flag:
+HTB{roncfbw7iszerd7shni7jr2343zhrj}
+
+Mailbox listing revealed:
+
+INBOX
+
+DEV
+
+DEV.DEPARTMENT
+
+DEV.DEPARTMENT.INT
+
+This confirmed:
+
+Credentials are valid
+
+IMAP is accessible
+
+The interesting mailbox is not INBOX
+
+3. IMAP Interactive Session (Protocol-Correct Enumeration)
+You switched to an interactive IMAP session using OpenSSL:
+
+bash
+Copy code
+openssl s_client -connect 10.129.1.2:993 -crlf -quiet
+Then executed proper IMAP commands:
+
+text
+Copy code
+A1 LOGIN robin robin
+A2 LIST "" *
+This again confirmed the mailboxes:
+
+INBOX
+
+DEV.DEPARTMENT.INT
+
+4. Inbox Check (Empty)
+You selected the INBOX:
+
+text
+Copy code
+A3 SELECT INBOX
+Response showed:
+
+0 EXISTS
+
+Meaning no emails were stored in INBOX.
+
+5. Selecting the Internal Department Mailbox
+You correctly selected the internal mailbox:
+
+text
+Copy code
+A4 SELECT DEV.DEPARTMENT.INT
+Response showed:
+
+1 EXISTS
+
+Meaning one email is present in this mailbox.
+
+6. Reading the Email Header
+You fetched the email headers:
+
+text
+Copy code
+A5 FETCH 1 BODY[HEADER]
+Header contents:
+
+yaml
+Copy code
+Subject: Flag
+To: Robin <robin@inlanefreight.htb>
+From: CTO <devadmin@inlanefreight.htb>
+Date: Wed, 03 Nov 2021 16:13:27 +0200
+This revealed:
+
+Internal admin email address: devadmin@inlanefreight.htb
+
+The email is explicitly titled “Flag”
+
+7. Reading the Email Body (Actual Flag)
+You then fetched the email body:
+
+text
+Copy code
+A6 FETCH 1 BODY[TEXT]
+Email body contained the actual required flag:
+
+Copy code
+HTB{983uzn8jmfgpd8jmof8c34n7zio}
+8. Final Result
+The correct flag retrieved from inside the IMAP email body is:
+
+Copy code
+HTB{983uzn8jmfgpd8jmof8c34n7zio}
+Key Takeaways
+Banner flags ≠ task flags (HTB often differentiates)
+
+INBOX may be empty; enumerate all mailboxes
+
+Use protocol-correct commands (IMAP ≠ POP3)
+
+Internal mailboxes often contain sensitive data
+
+Fetching BODY[TEXT] is required to read actual message content
+
+✔ Task completed exactly as intended by the lab
+✔ Proper IMAP enumeration and mail extraction demonstrated
