@@ -190,82 +190,65 @@ You connected to IMAPS using curl:
 curl -k imaps://10.129.1.2 --user robin:robin -v
 ```
 Results:
-
+```
 TLS handshake succeeded
-
 Authentication succeeded
-
 IMAP server greeting banner displayed a flag:
 HTB{roncfbw7iszerd7shni7jr2343zhrj}
+```
 
 Mailbox listing revealed:
-
+```
 INBOX
-
 DEV
-
 DEV.DEPARTMENT
-
 DEV.DEPARTMENT.INT
-
 This confirmed:
-
 Credentials are valid
-
 IMAP is accessible
-
 The interesting mailbox is not INBOX
+```
 
 3. IMAP Interactive Session (Protocol-Correct Enumeration)
 You switched to an interactive IMAP session using OpenSSL:
 
-bash
-Copy code
+```bash
 openssl s_client -connect 10.129.1.2:993 -crlf -quiet
+```
 Then executed proper IMAP commands:
-
-text
-Copy code
+```
 A1 LOGIN robin robin
 A2 LIST "" *
+```
 This again confirmed the mailboxes:
-
+```
 INBOX
-
 DEV.DEPARTMENT.INT
-
+```
 4. Inbox Check (Empty)
 You selected the INBOX:
-
-text
-Copy code
+```
 A3 SELECT INBOX
 Response showed:
-
 0 EXISTS
-
+```
 Meaning no emails were stored in INBOX.
 
 5. Selecting the Internal Department Mailbox
 You correctly selected the internal mailbox:
-
-text
-Copy code
+```bash
 A4 SELECT DEV.DEPARTMENT.INT
+```
 Response showed:
-
 1 EXISTS
-
+```
 Meaning one email is present in this mailbox.
 
 6. Reading the Email Header
 You fetched the email headers:
-
-text
-Copy code
+```
 A5 FETCH 1 BODY[HEADER]
 Header contents:
-
 yaml
 Copy code
 Subject: Flag
@@ -273,36 +256,35 @@ To: Robin <robin@inlanefreight.htb>
 From: CTO <devadmin@inlanefreight.htb>
 Date: Wed, 03 Nov 2021 16:13:27 +0200
 This revealed:
-
 Internal admin email address: devadmin@inlanefreight.htb
-
 The email is explicitly titled “Flag”
-
+```
 7. Reading the Email Body (Actual Flag)
 You then fetched the email body:
-
-text
-Copy code
-A6 FETCH 1 BODY[TEXT]
+```A6 FETCH 1 BODY[TEXT]
 Email body contained the actual required flag:
-
-Copy code
-HTB{983uzn8jmfgpd8jmof8c34n7zio}
+HTB{983uzn8jmfgpd8jmof8c34n7zio}```
 8. Final Result
 The correct flag retrieved from inside the IMAP email body is:
-
-Copy code
-HTB{983uzn8jmfgpd8jmof8c34n7zio}
+```HTB{983uzn8jmfgpd8jmof8c34n7zio}
 Key Takeaways
 Banner flags ≠ task flags (HTB often differentiates)
+```
 
 INBOX may be empty; enumerate all mailboxes
-
 Use protocol-correct commands (IMAP ≠ POP3)
-
 Internal mailboxes often contain sensitive data
-
 Fetching BODY[TEXT] is required to read actual message content
 
-✔ Task completed exactly as intended by the lab
-✔ Proper IMAP enumeration and mail extraction demonstrated
+**SNMP**
+The SNMP module explains how the Simple Network Management Protocol is used to monitor and manage networked devices such as routers, switches, servers, and IoT systems. SNMP operates primarily over UDP port 161 for queries and configuration changes, while traps are sent asynchronously from servers to clients over UDP port 162 when specific events occur. Central to SNMP is the Management Information Base (MIB), a standardized, hierarchical structure written in ASN.1 that defines Object Identifiers (OIDs). OIDs uniquely identify pieces of information on a device and allow clients to query system details in a consistent way across vendors.
+
+The module compares SNMP versions, highlighting that SNMPv1 and SNMPv2c lack encryption and rely on plaintext community strings for access control, making them insecure and attractive targets for attackers. SNMPv3 significantly improves security through authentication and encryption but is more complex to configure, which leads many organizations to continue using older versions.
+
+From an offensive perspective, the module demonstrates how misconfigurations—such as default or weak community strings and read/write access—can expose sensitive system information. Tools like snmpwalk, onesixtyone, and braa are used to enumerate OIDs, brute-force community strings, and extract data such as hostnames, installed software, and administrator contact details. The module emphasizes that SNMP can be both a powerful administrative tool and a serious security risk when improperly configured.
+
+SNMP walk was able to enumerate the version of SNMP, the admin contact and a custom script that was running on a server. Very powerfull enumeration tool.
+
+```bash
+snmpwalk -v2c -c public 10.129.192.69
+```
