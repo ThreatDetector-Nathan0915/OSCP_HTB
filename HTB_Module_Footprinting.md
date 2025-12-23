@@ -288,3 +288,49 @@ SNMP walk was able to enumerate the version of SNMP, the admin contact and a cus
 ```bash
 snmpwalk -v2c -c public 10.129.192.69
 ```
+
+# My SQL
+This section covers MySQL service enumeration and basic database interaction from a penetration testing perspective. MySQL is a widely used open-source relational database management system that follows a client-server model, commonly deployed in LAMP/LEMP stacks to store application data such as users, credentials, emails, and customer records. Because databases often contain sensitive information, misconfigurations—such as weak credentials or external exposure—can lead to serious security risks.
+
+During enumeration, MySQL services are typically identified on TCP port 3306 using tools like Nmap, which can reveal version information, authentication plugins, and potential misconfigurations. However, scan results must always be manually validated, as false positives are common. Once valid credentials are obtained, attackers can authenticate using the MySQL client and enumerate databases, tables, and columns using standard SQL commands like SHOW DATABASES, USE, and SELECT.
+
+In this assessment, weak credentials (robin:robin) allowed successful access to a remotely exposed MySQL server running MySQL 8.0.27. Inside the customers database, a table named myTable contained customer data, including names and email addresses. By querying the name column with pattern matching, the email address for the customer Otto Lang was retrieved as ultrices@google.htb
+.
+
+This exercise demonstrates how weak authentication and exposed database services can directly lead to sensitive data disclosure.
+
+# MySQL Enumeration & Data Extraction – Command List
+
+# Scan MySQL service and enumerate version/auth info
+nmap -sV -sC -p3306 --script mysql* <TARGET_IP>
+# Identifies MySQL service, version, auth plugin, and potential misconfigurations
+
+# Connect to MySQL using discovered weak credentials (disable SSL verification)
+mysql -h <TARGET_IP> -u robin -p --ssl-mode=DISABLED
+# Authenticates to the remote MySQL server despite self-signed TLS certificate
+
+# Show MySQL server version
+SELECT version();
+# Confirms exact MySQL version in use
+
+# List all databases on the server
+SHOW DATABASES;
+# Enumerates accessible databases
+
+# Select the customers database
+USE customers;
+# Switches context to the target database
+
+# List tables in the customers database
+SHOW TABLES;
+# Reveals available tables holding data
+
+# Inspect table structure
+DESCRIBE myTable;
+# Displays columns, data types, and schema for customer data
+
+# Search for the customer Otto Lang by name
+SELECT name, email
+FROM myTable
+WHERE name LIKE '%Otto%' AND name LIKE '%Lang%';
+# Retrieves the email address associated with Otto Lang
