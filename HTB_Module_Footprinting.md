@@ -85,16 +85,58 @@ Export list for 10.129.202.5:
 1 directory, 1 file
 ```
 
+# DNS
+Doing xone transfers can expose local hosts DNS servers on a internal network
 
+
+
+
+
+DNS bruteforceing install puredns
+```bash
+sudo apt install golang -y
+go install github.com/d3mondev/puredns/v2@latest
+export PATH=$PATH:$HOME/go/bin
+sudo apt update
+sudo apt install git make gcc -y
+git clone https://github.com/blechschmidt/massdns.git
+cd massdns
+make
+sudo cp bin/massdns /usr/local/bin/
+```
+
+Puredns command to bruteforce subdomain quickly
+```bash
+puredns bruteforce /home/kali/SecLists-master/Discovery/DNS/combined_subdomains.txt \
+  inlanefreight.htb \
+  --resolvers-trusted resolvers.txt \
+  --trusted-only \
+  --skip-wildcard-filter \
+  --skip-sanitize \
+  -w resolved.txt
+```
+**other bruteforce**
+```bash
 dnsrecon -d inlanefreight.htb -n 10.129.203.75 -D /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt -t brt
-
-
-└─$ dig @10.129.203.75 internal.inlanefreight.htb AXFR
-└─$ dig axfr internal.inlanefreight.htb @10.129.203.75
 
 └─$ gobuster dns -d inlanefreight.htb -r 10.129.203.75 -w /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-5000.txt 
 
 amass enum -d inlanefreight.htb -brute -recursive -w dns-Jhaddix.txt
+
+└─$ dnsenum --dnsserver 10.129.154.35 --enum -p 0 -s 0 -o subdomains.txt -f /home/kali/SecLists-master/Discovery/DNS/subdomains.txt inlanefreight.htb
+
+```
+
+
+**Zone Transfers**
+```bash
+└─$ dig @10.129.203.75 internal.inlanefreight.htb AXFR
+└─$ dig axfr internal.inlanefreight.htb @10.129.203.75
+```
+**Reverse lookuup a domain name**
+```bash
+dig +short app.inlanefreight.htb @10.129.154.35
+```
 
 
 **SMTP**
