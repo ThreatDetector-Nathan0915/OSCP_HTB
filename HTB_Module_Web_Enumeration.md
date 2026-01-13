@@ -79,3 +79,29 @@ dig +short domain.com	Provides a short, concise answer to the query.
 dig +noall +answer domain.com	Displays only the answer section of the query output.
 dig domain.com ANY	Retrieves all available DNS records for the domain (Note: Many DNS servers ignore ANY queries to reduce load and prevent abuse, as per RFC 8482).
 ```
+# DNS Bruteforcing
+DNS enum is really fast for DNS recon, it also allows recursion and does zone transfers by default. Good command to user
+```bash
+└─$ dnsenum --enum inlanefreight.com -f  /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt    
+```
+Command Meanings
+```
+dnsenum --enum inlanefreight.com: We specify the target domain we want to enumerate, along with a shortcut for some tuning options --enum.
+-f /usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt: We indicate the path to the SecLists wordlist we'll use for brute-forcing. Adjust the path if your SecLists installation is different.
+-r: This option enables recursive subdomain brute-forcing, meaning that if dnsenum finds a subdomain, it will then try to enumerate subdomains of that subdomain.
+```
+# DNS Zones
+DNS zones hold all of the alias's and hostnames of DNS records for a specific zone, and is a wealth of information. Typically a zone transfer is not allowed by a unknown IP and only can be triggered via valid DNS servers. That being said misconfigurations happen and the follwing DIG command can enumerate the DNS zone via conducting a transfer.
+```bash
+└─$ dig axfr inlanefreight.htb @10.129.144.236              
+```
+dig axfr (zone transfer) target @target_ip
+
+# VOSTs
+VHOST will allow a server to host multiple web pages on a single IP it will sever the correct content based on the web request header. Enumerating differnt domains in a VHOST can be done with Fuff
+```bash
+└─$ ffuf -w /home/kali/SecLists-master/Discovery/DNS/namelist.txt \
+-u http://inlanefreight.htb:53295 -H "Host: FUZZ.inlanefreight.htb" \
+-fs 116
+```
+
