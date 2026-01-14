@@ -105,3 +105,8 @@ VHOST will allow a server to host multiple web pages on a single IP it will seve
 -fs 116
 ```
 
+# Website Service enumeration 
+WaWappalyzer is realy great browser extension. Also nikto
+```bash
+└─$ nikto -h app.inlanefreight.local -Tuning b
+```
