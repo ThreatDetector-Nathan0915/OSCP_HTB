@@ -110,3 +110,80 @@ WaWappalyzer is realy great browser extension. Also nikto
 ```bash
 └─$ nikto -h app.inlanefreight.local -Tuning b
 ```
+
+# Web Crawling tool
+A great tool for web crawling is ReconSpider
+Intall -
+```bash
+darkmercinary7@htb[/htb]$ pip3 install scrapy
+darkmercinary7@htb[/htb]$ wget -O ReconSpider.zip https://academy.hackthebox.com/storage/modules/144/ReconSpider.v1.2.zip
+darkmercinary7@htb[/htb]$ unzip ReconSpider.zip 
+```
+Command to execute reconspider--
+```bash
+darkmercinary7@htb[/htb]$ python3 ReconSpider.py http://inlanefreight.com
+```
+Results from the scrape are saved in results.json and can have some good enumeration material in it.
+
+# Google Dorking Cheatsheet
+```
+Operator	Operator Description	Example	Example Description
+site:	Limits results to a specific website or domain.	site:example.com	Find all publicly accessible pages on example.com.
+inurl:	Finds pages with a specific term in the URL.	inurl:login	Search for login pages on any website.
+filetype:	Searches for files of a particular type.	filetype:pdf	Find downloadable PDF documents.
+intitle:	Finds pages with a specific term in the title.	intitle:"confidential report"	Look for documents titled "confidential report" or similar variations.
+intext: or inbody:	Searches for a term within the body text of pages.	intext:"password reset"	Identify webpages containing the term “password reset”.
+cache:	Displays the cached version of a webpage (if available).	cache:example.com	View the cached version of example.com to see its previous content.
+link:	Finds pages that link to a specific webpage.	link:example.com	Identify websites linking to example.com.
+related:	Finds websites related to a specific webpage.	related:example.com	Discover websites similar to example.com.
+info:	Provides a summary of information about a webpage.	info:example.com	Get basic details about example.com, such as its title and description.
+define:	Provides definitions of a word or phrase.	define:phishing	Get a definition of "phishing" from various sources.
+numrange:	Searches for numbers within a specific range.	site:example.com numrange:1000-2000	Find pages on example.com containing numbers between 1000 and 2000.
+allintext:	Finds pages containing all specified words in the body text.	allintext:admin password reset	Search for pages containing both "admin" and "password reset" in the body text.
+allinurl:	Finds pages containing all specified words in the URL.	allinurl:admin panel	Look for pages with "admin" and "panel" in the URL.
+allintitle:	Finds pages containing all specified words in the title.	allintitle:confidential report 2023	Search for pages with "confidential," "report," and "2023" in the title.
+AND	Narrows results by requiring all terms to be present.	site:example.com AND (inurl:admin OR inurl:login)	Find admin or login pages specifically on example.com.
+OR	Broadens results by including pages with any of the terms.	"linux" OR "ubuntu" OR "debian"	Search for webpages mentioning Linux, Ubuntu, or Debian.
+NOT	Excludes results containing the specified term.	site:bank.com NOT inurl:login	Find pages on bank.com excluding login pages.
+* (wildcard)	Represents any character or word.	site:socialnetwork.com filetype:pdf user* manual	Search for user manuals (user guide, user handbook) in PDF format on socialnetwork.com.
+.. (range search)	Finds results within a specified numerical range.	site:ecommerce.com "price" 100..500	Look for products priced between 100 and 500 on an e-commerce website.
+" " (quotation marks)	Searches for exact phrases.	"information security policy"	Find documents mentioning the exact phrase "information security policy".
+- (minus sign)	Excludes terms from the search results.	site:news.com -inurl:sports	Search for news articles on news.com excluding sports-related content.
+```
+
+# Automate recon Final Recon
+Install
+```bash
+darkmercinary7@htb[/htb]$ git clone https://github.com/thewhiteh4t/FinalRecon.git
+darkmercinary7@htb[/htb]$ cd FinalRecon
+darkmercinary7@htb[/htb]$ sudo python3 -m pip install --break-system-packages -r requirements.txt
+darkmercinary7@htb[/htb]$ chmod +x ./finalrecon.py
+darkmercinary7@htb[/htb]$ ./finalrecon.py --help
+```
+Usage
+```bash
+darkmercinary7@htb[/htb]$ ./finalrecon.py --headers --whois --url http://inlanefreight.com
+```
+OR 
+
+```bash
+cd ~/Desktop/FinalRecon
+
+# 1) make sure venv support is installed
+sudo apt update
+sudo apt install -y python3-venv
+
+# 2) create + activate venv
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3) upgrade pip + install/upgrade deps (especially tldextract)
+python -m pip install -U pip setuptools wheel
+python -m pip install -U "tldextract>=5.3.0"
+
+# 4) install finalrecon requirements inside venv (no sudo)
+pip install -r requirements.txt
+
+# 5) run using the venv python
+python finalrecon.py --full --url http://inlanefreight.com
+```
