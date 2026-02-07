@@ -35,3 +35,60 @@ ls -ltR --time-style=+"%Y-%m-%d %T" ./ | grep -v '^d' | sort -k6,7 | cut -d' ' -
 cd /home/cowrie/cowrie/var/lib/cowrie/tty
 python3 /home/cowrie/cowrie/bin/playlog ./c823f67fc615fba20a757442184b23c5eb23cd1159e4a36c007554ddc95c16e8
 ```
+Create enrichment with abuseipdb for Wazuh agent.
+Made account
+copy api key
+added integration for abuseip to wazuh integrations
+made logs on the linux ssh sever for a test ip out of the abuse ip list 
+saw them trigger with api lookup
+added logic for confidence score above 70% see workbook for more 
+Restart Wazuh
+```bash
+systemctl status wazuh-manager
+```
+Check Wazuh status
+```bash
+systemctl status wazuh-dashboard
+systemctl status wazuh-indexer
+```
+list integrations
+```bash
+ls -l /var/ossec/integrations
+```
+view alerts 
+```bash
+ls /var/ossec/logs/alerts/
+```
+look at rule files
+```bash
+ls /var/ossec/ruleset/rules/ | grep vsftpd
+```
+Install and launch ssh server on linux host
+```bash 
+sudo su
+sudo apt-get update
+apt install openssh-server
+systemctl start ssh
+```
+Enabled abuseipdb integration in wazuh
+```bash
+chmod 755 /var/ossec/integrations/custom-abuseipdb.py
+chown root:wazuh /var/ossec/integrations/custom-abuseipdb.py
+```
+Add integration and api key into wazuh conf
+```bash
+nano /var/ossec/etc/ossec.conf
+<!-- Abuse IPDB Integration -->
+<integration>
+<name>custom-abuseipdb.py</name>
+<hook_url>https://api.abuseipdb.com/api/v2/check</hook_url>
+<api_key>YOUR_ABUSEIPDB_API_KEY</api_key>
+<level>10</level>
+<rule_id>100002</rule_id>
+<alert_format>json</alert_format>
+</integration>
+```
+review integration activity
+```bash
+tail -f /var/ossec/logs/integrations.log
+```
