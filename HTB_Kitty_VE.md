@@ -1,70 +1,72 @@
-# 🎯 Easy Telnet Exploitation – Host Summary
+# Telnet — unauthenticated root (lab)
 
-This walkthrough covers the compromise of a very basic host running an exposed and misconfigured **Telnet** service with unauthenticated root access.
-
----
-
-## 🔍 Step 1: Basic Port & Service Scan
-
-Executed a simple version scan to enumerate open ports:
-
-```bash
-nmap -sV 192.168.X.X
-```
-
-### Output:
-```
-23/tcp open  telnet
-```
-
-Telnet is **insecure by design** — it transmits credentials in plaintext and is highly vulnerable to brute force or login misconfig.
+Telnet (**TCP 23**) sends traffic in **cleartext**. Labs sometimes expose Telnet with **no authentication** on privileged accounts—documented here only for **authorized** training.
 
 ---
 
-## 🔐 Step 2: Manual Telnet Login Attempt
+## Step 1 — Port scan
 
-Knowing Telnet was open, we attempted to brute credentials manually.
+**Command:**
 
 ```bash
-telnet 192.168.X.X
+nmap -sV <target-ip>
 ```
 
-### ✅ Successful Login:
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Determine service banner/version on open ports |
 
-When prompted for a username, we tried:
+**Example line:** `23/tcp open telnet`
 
-```
-Username: root
-Password: [left blank]
-```
-
-No password was required — logged in directly as **root**. Classic misconfig.
+**QC:** Replace `<target-ip>` with the lab machine (do not leave `192.168.X.X` placeholders in final notes).
 
 ---
 
-## 📁 Step 3: Flag Capture
+## Step 2 — Telnet session
 
-Once in, standard Linux command usage to look for the flag:
+**Connect:**
 
 ```bash
-ls
+telnet <target-ip>
+```
+
+At prompts, test whether **root** accepts an **empty password** (lab-only misconfiguration):
+
+```text
+login: root
+Password: [Enter]
+```
+
+If successful, you have an interactive **root** shell over cleartext Telnet.
+
+**QC:** Prefer **`nc`** or **`openssl s_client`** for banner grabs when you do not need a full TTY; use Telnet only where the service requires it.
+
+---
+
+## Step 3 — Flag or post-access
+
+```bash
+ls -la
 cat flag.txt
 ```
 
-Flag was sitting in the home directory. Grabbed it, done.
+Adjust paths per the lab layout.
 
 ---
 
-## ✅ Summary
+## Summary
 
-| Phase          | Action                        | Result                       |
-|----------------|-------------------------------|------------------------------|
-| Port Scan      | `nmap -sV`                    | Identified Telnet on port 23 |
-| Access Attempt | `telnet`                      | Root login with no password  |
-| Enumeration    | `ls`, `cat`                   | Found and captured the flag  |
+| Phase | Action | Result |
+|-------|--------|--------|
+| Scan | `nmap -sV <target-ip>` | Telnet on **23/tcp** |
+| Access | `telnet <target-ip>` | Root with blank password |
+| Read | `ls`, `cat flag.txt` | Objective data retrieved |
 
 ---
 
-> **Note**: This host represents real-world low-hanging fruit—open Telnet with blank root passwords is still occasionally found in embedded systems, legacy devices, and exposed test environments.
+## Notes
 
-💀 **Root shell in under 30 seconds.**
+- Real networks should **disable Telnet** and use **SSH** with key-based auth and MFA.
+- Embedded/ICS environments may still expose Telnet—treat as **critical** exposure when reachable from untrusted networks.
+
+**Status:** lab session completed.

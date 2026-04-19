@@ -1,138 +1,156 @@
-# 🚀 Hack The Box Academy – Port Redirection & SSH Tunneling  
-## 🔒 Section 19.3.1 – SSH Local Port Forwarding: Deep Pivot into Internal Networks!
+# Hack The Box Academy: Port Redirection and SSH Tunneling
 
-We previously used `socat` to forward ports from CONFLUENCE01 to PGDATABASE01 and successfully tunneled PostgreSQL traffic. But now... SOCAT IS GONE! We must adapt. Enter: SSH Local Port Forwarding!
+## Section 19.3.1: SSH local port forwarding
 
-Unlike `socat`, where the same host listens and forwards, SSH local port forwarding sets up a listener on the **SSH client** machine (here: CONFLUENCE01), then tunnels traffic to the SSH **server** (PGDATABASE01), which finally forwards it to an internal destination. This lets us use `ssh -L` to pivot deeply inside segmented networks and reach **previously unreachable services**!
+Earlier steps used `socat` to reach PostgreSQL via `CONFLUENCE01`. This section uses **SSH local port forwarding** (`ssh -L`) when Socat is not the right tool.
 
-🧠 Scenario: CONFLUENCE01 can still bind ports on its WAN interface. PGDATABASE01 has a second interface in a hidden subnet `172.16.50.0/24`. There’s a host inside this subnet running **SMB on port 445** — and we want access to that SMB share directly from our Kali machine. So we’ll forward traffic from **CONFLUENCE01:4455 → PGDATABASE01 → 172.16.50.217:445** via SSH!
+**Difference:** with Socat, the forwarder listens on the same host that runs the forwarder process. With **local** SSH port forwarding, the **SSH client** (here: `CONFLUENCE01`) opens the listener; the SSH **server** (`PGDATABASE01`) terminates the tunnel and connects to the target you specify. Traffic flows: client → SSH server → internal service.
+
+**Scenario:** `CONFLUENCE01` can bind on its WAN interface. `PGDATABASE01` has a second interface on `172.16.50.0/24`. A host at `172.16.50.217` offers **SMB on 445**. Goal: reach that SMB service from **Kali** using **CONFLUENCE01:4455 → PGDATABASE01 → 172.16.50.217:445**.
 
 ---
 
-### 🧪 Step 1: Get Shell on CONFLUENCE01
+### Step 1: Shell on CONFLUENCE01
 
-Use CVE-2022-26134 to get a reverse shell on CONFLUENCE01.
-
-Immediately stabilize it with a TTY:
+Use CVE-2022-26134 to obtain a shell on `CONFLUENCE01`, then stabilize TTY as needed:
 
 ```bash
 python3 -c 'import pty; pty.spawn("/bin/sh")'
 ```
 
+Allocates a **pseudo-TTY** so line editing, `su`, and full-screen tools behave more predictably than in a raw reverse shell.
+
 ---
 
-### 🔐 Step 2: SSH Into PGDATABASE01 from CONFLUENCE01
+### Step 2: SSH from CONFLUENCE01 to PGDATABASE01
 
-Use previously cracked credentials (`database_admin`):
+Use valid credentials (e.g. `database_admin`):
 
 ```bash
 ssh database_admin@10.4.50.215
 ```
 
-Accept the fingerprint warning and provide the password.
+First hop is **interactive SSH** to the database host on its **DMZ** address. Accept the host key when prompted (fingerprint pinning in real ops).
 
-🎉 You’re now on PGDATABASE01!
+| Detail | Note |
+|--------|------|
+| Default port | **22/tcp** unless `-p` is given |
+| User | Lab account recovered earlier (`database_admin`) |
+
+On success, the shell prompt should reflect **`PGDATABASE01`**.
 
 ---
 
-### 🔎 Step 3: Enumerate Network Interfaces
+### Step 3: Interface enumeration
 
 ```bash
 ip addr
 ```
 
-👀 Output:
+Typical result:
 
-- ens192 = `10.4.50.215`
-- ens224 = `172.16.50.215` → BINGO! We found a second internal subnet!
+- `ens192` → `10.4.50.215` (DMZ toward `CONFLUENCE01`)
+- `ens224` → `172.16.50.215` (internal segment)
 
-Now view routing info:
+Routing:
 
 ```bash
 ip route
 ```
 
-Result:
-
-```
+```text
 10.4.50.0/24 dev ens192
 172.16.50.0/24 dev ens224
 ```
 
-💥 This confirms that PGDATABASE01 bridges two subnets: WAN (`10.4.50.x`) and internal (`172.16.50.x`)!
+`PGDATABASE01` therefore routes to both `10.4.50.0/24` and `172.16.50.0/24`.
 
 ---
 
-### 📡 Step 4: Scan for Hosts with SMB on 172.16.50.0/24
+### Step 4: Locate SMB on 172.16.50.0/24
 
-Use a `for` loop and `nc` to scan:
+Example sweep with `nc`:
 
 ```bash
 for i in $(seq 1 254); do nc -zv -w 1 172.16.50.$i 445; done
 ```
 
-Eventually you hit:
+| `nc` flag | Meaning |
+|-----------|---------|
+| `-z` | **Zero-I/O** scan mode (do not send payload data) |
+| `-v` | Verbose “succeeded/refused” messages |
+| `-w 1` | **1 s** connect timeout per host (tune up on lossy links) |
 
-```
+Successful connect example:
+
+```text
 Connection to 172.16.50.217 445 port [tcp/microsoft-ds] succeeded!
 ```
 
-🎯 TARGET LOCKED: 172.16.50.217 is running an SMB service on port 445!
+**Finding:** `172.16.50.217` exposes SMB on **445**.
 
 ---
 
-### 🛑 Problem: How do we reach it from Kali?
+### Step 5: Problem statement
 
-You can't directly connect from Kali → 172.16.50.217:445. You also can’t run `smbclient` from PGDATABASE01, and transferring files via multiple hops would suck.
-
-💡 Solution: SSH LOCAL PORT FORWARDING to the rescue!
+Kali cannot route to `172.16.50.217:445` directly. Running `smbclient` on `PGDATABASE01` may be impractical. **Local SSH forwarding** maps a port on `CONFLUENCE01` through the SSH session to `PGDATABASE01`, which then opens the connection to the internal SMB host.
 
 ---
 
-### 🧰 Step 5: SSH Local Port Forwarding Setup
+### Step 6: SSH local forward
 
-From CONFLUENCE01 (with reverse shell access), SSH into PGDATABASE01 again, but this time add a local port forward:
+From `CONFLUENCE01` (first shell), open a forward **without** an interactive shell:
 
 ```bash
 ssh -N -L 0.0.0.0:4455:172.16.50.217:445 database_admin@10.4.50.215
 ```
 
-Explanation:
+| Flag | Meaning |
+|------|---------|
+| `-N` | No remote command; forward only |
+| `-L 0.0.0.0:4455:172.16.50.217:445` | On the **client** (`CONFLUENCE01`), listen on `0.0.0.0:4455`; send traffic through SSH so the **server** connects to `172.16.50.217:445` |
 
-- `-N`: Don't open a shell (just forward)
-- `-L`: Define the port forwarding
-- `0.0.0.0:4455`: Listen on all interfaces on CONFLUENCE01 at port 4455
-- `172.16.50.217:445`: Forward packets to this destination via PGDATABASE01
+After authentication the session stays quiet; that is expected.
 
-After authenticating, SSH sits silently — it’s working!
-
-From a second shell on CONFLUENCE01, verify it’s listening:
+Verify listen state from another session on `CONFLUENCE01`:
 
 ```bash
 ss -ntplu
 ```
 
+| Flag | Meaning |
+|------|---------|
+| `-n` | Numeric ports (no service name resolution) |
+| `-t` | TCP sockets |
+| `-p` | Show **process** owning the socket (may need `sudo`) |
+| `-l` | **Listening** sockets only |
+| `-u` | UDP (optional here; harmless) |
+
 Look for:
 
-```
+```text
 tcp LISTEN 0.0.0.0:4455 users:(("ssh",pid=...,fd=...))
 ```
 
-✔️ Forwarding is LIVE!
-
 ---
 
-### 🎉 Step 6: Access the SMB Share from Kali via Forwarded Port
+### Step 7: SMB from Kali through the forward
 
-Back on your Kali machine, point `smbclient` to CONFLUENCE01:4455 (our local port forward), using the cracked creds for `hr_admin`:
+Point SMB at **WAN IP of `CONFLUENCE01`** and the forwarded port (example credentials `hr_admin`):
 
 ```bash
 smbclient -p 4455 -L //192.168.50.63/ -U hr_admin --password=Welcome1234
 ```
 
-Output:
+| Flag | Meaning |
+|------|---------|
+| `-p 4455` | **Non-default SMB port** on the pivot (your `-L` forward bind) |
+| `-L` | List shares |
+| `-U` / `--password` | Credentials (avoid `--password` in shell history in real tests; prefer `-A` file or prompt) |
 
-```
+Example share list:
+
+```text
 Sharename       Type      Comment
 ---------       ----      -------
 ADMIN$          Disk      Remote Admin
@@ -142,17 +160,19 @@ scripts         Disk
 Users           Disk
 ```
 
-BOOM! There’s a share named `scripts`.
+**Notable share:** `scripts`.
 
-Connect and grab files:
+Connect:
 
 ```bash
 smbclient -p 4455 //192.168.50.63/scripts -U hr_admin --password=Welcome1234
 ```
 
-Inside:
+Connects to share **`scripts`** on the same forwarded endpoint.
 
-```
+Example listing:
+
+```text
 Provisioning.ps1
 README.txt
 ```
@@ -163,37 +183,28 @@ Download:
 get Provisioning.ps1
 ```
 
-✔️ FILE EXFILTRATED to your Kali box — directly through your SSH tunnel!
+File transfer completes over the SSH tunnel to Kali.
 
 ---
 
-## 🧠 Key Takeaways
+## Key takeaways
 
-- SSH local port forwarding allows **one-directional tunneling** from client → server → internal host.
-- It’s perfect for exfiltration and service enumeration when your tools are limited.
-- This specific SSH command:
-  
-  ```bash
-  ssh -N -L 0.0.0.0:4455:172.16.50.217:445 database_admin@10.4.50.215
-  ```
+- **Local** (`-L`) forwarding binds on the SSH **client** and delivers traffic to a host:port **as seen from the SSH server**.
+- Useful when tools must run on Kali but only a jump host can reach the internal subnet.
+- The example command:
 
-  created a pivot from Kali → CONFLUENCE01:4455 → PGDATABASE01 → 172.16.50.217:445!
+```bash
+ssh -N -L 0.0.0.0:4455:172.16.50.217:445 database_admin@10.4.50.215
+```
 
----
-
-## 🧠 What You Learned
-
-- How to tunnel around restricted networks without `socat`
-- How to combine multiple pivots with SSH, port forwarding, and cracked creds
-- How to enumerate and access internal Windows services like SMB from the outside world
-- That you are a certified lateral movement NINJA 🥷
+implements **Kali → CONFLUENCE01:4455 → (SSH) → PGDATABASE01 → 172.16.50.217:445**.
 
 ---
 
-## ✅ Mission Complete!
+## Summary
 
-You reached a **deep SMB service** buried inside a hidden network, and exfiltrated files — all through **layered port forwarding with SSH**.
+- Pivot without `socat` by chaining SSH and `-L`.
+- Combine **credential reuse**, **routing knowledge**, and **forwarded SMB** to extract data from segmented Windows services.
+- This pattern matches common **red team** and **assumed breach** exercises where multiple hops are required.
 
-This is the essence of real-world red teaming.
-
-**🔥 ONWARD, PORT FORWARDING WARRIOR! 🔥**
+Always record listener addresses, ports, and credentials used in lab notes for reproducibility and for client deliverables.

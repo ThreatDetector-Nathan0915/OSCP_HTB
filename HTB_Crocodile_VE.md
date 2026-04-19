@@ -1,82 +1,79 @@
-# 📦 FTP Credential Reuse & Web Login – HTB Walkthrough
+# FTP credential reuse and web login
+
+Anonymous **FTP** exposes credential files; the same material often unlocks the **web** application.
 
 ---
 
-## 🔍 Initial Nmap Enumeration
+## Nmap
 
 ```bash
 nmap -sV -sC 10.129.155.217
 ```
 
-- Found open FTP port (21) with anonymous login allowed.
-- Port 80 (HTTP) hosting a basic web server.
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Service/version |
+| `-sC` | Default NSE scripts (often flags anonymous FTP) |
+
+**Typical findings:** **TCP 21** (FTP), **TCP 80** (HTTP).
 
 ---
 
-## 📁 FTP Enumeration & Credential Extraction
+## FTP — anonymous login
 
 ```bash
 ftp 10.129.155.217
 ```
 
-- Logged in using:
-  ```
-  Name: anonymous
-  ```
-- Listed directory contents:
-  ```bash
-  ftp> dir
-  ```
-- Downloaded files of interest:
-  ```bash
-  ftp> get allowed.userlist
-  ftp> get allowed.userlist.psswd
-  ```
+Use username **`anonymous`** (blank or guest e-mail password if prompted).
 
-### 🔍 Local inspection of files:
+**Useful FTP client commands:**
+
+```text
+dir
+get allowed.userlist
+get allowed.userlist.psswd
+```
+
+**Local review:**
 
 ```bash
 cat allowed.userlist
 cat allowed.userlist.psswd
 ```
 
-- Revealed usernames and passwords that could be reused elsewhere.
+Extract username/password pairs for reuse testing.
 
 ---
 
-## 🌐 Web Server Exploration
+## Web and Gobuster
 
-Visited `http://10.129.155.217` in browser — saw a basic, non-functional landing page.
+Browse `http://10.129.155.217`. Static landing pages often hide a real app behind a path.
 
-### Directory Enumeration with Gobuster
+**Directory brute force:**
 
 ```bash
-gobuster dir --url http://10.129.155.217/ -w common.txt -x php,html
+gobuster dir --url http://10.129.155.217/ -w /usr/share/wordlists/dirb/common.txt -x php,html
 ```
 
-- `-x php,html` ensures Gobuster only checks `.php` and `.html` file extensions.
-- Discovered `/login.php`.
+| Flag | Purpose |
+|------|---------|
+| `-x php,html` | For each wordlist entry, also try **`.php`** and **`.html`** suffixes (helps find `login.php`, `index.html`, etc.) |
+
+**QC:** Ensure `-w` points to a real path on your system (`common.txt` alone is rarely correct—prefer full path as in Preignition notes).
 
 ---
 
-## 🔐 Credential Reuse Attempt
+## Credential reuse
 
-- Navigated to: `http://10.129.155.217/login.php`
-- Tried username/password combos from the FTP dump manually.
-- Eventually succeeded in logging in.
+Open `http://10.129.155.217/login.php` (or path discovered by Gobuster) and attempt combinations from the FTP files until login succeeds.
 
 ---
 
-## 🏁 Final Result
+## Summary checklist
 
-- Logged into web portal using reused FTP credentials.
-- Flag was retrieved from the authenticated area.
-- Box pwned using FTP to Web login pivot 💥
+- Anonymous FTP → download user/password lists  
+- Gobuster → discover `login.php`  
+- Reuse credentials → authenticated area → flag  
 
-```bash
-✔️ Anonymous FTP access
-✔️ Credential extraction
-✔️ Gobuster for page discovery
-✔️ Web login using reused creds
-✔️ Flag captured
-```
+**Status:** initial access via FTP; pivot to web application; objectives completed.

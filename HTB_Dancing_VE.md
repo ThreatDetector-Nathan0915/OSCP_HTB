@@ -1,89 +1,73 @@
-# 🧾 SMB Share Enumeration and Exploitation – Full Walkthrough
+# SMB share enumeration (anonymous / guest)
 
-This writeup walks through discovering and exploiting an unsecured SMB share via anonymous access. The objective was to enumerate shares, find a misconfigured one, and download the flag.
-
----
-
-## 🔍 Step 1: Nmap Scan for SMB Discovery
-
-As always, we began with an `nmap` scan to enumerate open services, detect versions, and attempt OS fingerprinting:
-
-```bash
-nmap -sV -sC -O 10.65.1.23
-```
-
-### 🔎 Flags Recap:
-- `-sV` → Service/version detection
-- `-sC` → Default NSE scripts (includes `smb-enum*`)
-- `-O` → OS detection
-
-The scan revealed that SMB (port 445) was open and responding.
+Walkthrough pattern: **Nmap** finds **SMB**; **`smbclient`** lists shares; a **custom share** allows unauthenticated access; **`get`** retrieves the objective file. Replace `<TARGET_IP>` with your lab address consistently in every command.
 
 ---
 
-## 📂 Step 2: Enumerating SMB Shares
-
-We used the native Kali tool `smbclient` to enumerate available SMB shares:
+## Step 1 — Nmap
 
 ```bash
-smbclient -L 10.1.0.10
+nmap -sV -sC -O <TARGET_IP>
 ```
 
-This listed standard shares like:
-- `ADMIN$`
-- `IPC$`
-- `C$`
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Service/version on open ports |
+| `-sC` | Default NSE scripts (SMB enumeration helpers) |
+| `-O` | Remote OS fingerprint (may be low confidence behind firewalls) |
 
-But also revealed a **custom share** called:
-
-```
-WorkShare
-```
+**Expect:** **TCP 445** (`microsoft-ds`) and related **137/139** NetBIOS services on Windows targets.
 
 ---
 
-## 🔐 Step 3: Accessing the Unsecured Share
-
-We attempted to connect to the custom share:
+## Step 2 — List shares
 
 ```bash
-smbclient \\\\10.164.5.310\\WorkShare
+smbclient -N -L //<TARGET_IP>/
 ```
 
-When prompted for a password, we **just hit Enter**, and surprisingly got in.
+| Flag | Purpose |
+|------|---------|
+| `-N` | No password (guest / anonymous where permitted) |
+| `-L` | List share names |
 
-> ✅ This indicates the share was misconfigured to allow anonymous access without authentication.
+**QC:** On Linux use `//IP/` URL form; escaping backslashes (`\\\\IP\\`) is optional in `smbclient` depending on version.
+
+Identify non-default shares (e.g. `WorkShare`) for manual review.
 
 ---
 
-## 📁 Step 4: Navigating and Downloading Files
-
-Once inside the share:
+## Step 3 — Connect to the share
 
 ```bash
+smbclient //<TARGET_IP>/WorkShare -N
+```
+
+If the server allows **guest** access, pressing **Enter** at the password prompt may succeed.
+
+---
+
+## Step 4 — Browse and download
+
+Inside the `smb:` prompt:
+
+```text
 ls
-```
-
-We browsed through the files and folders until we located the flag.
-
-### Downloading the Flag:
-```bash
 get flag.txt
 ```
 
-The file was saved to the current local directory.
+| Command | Purpose |
+|---------|---------|
+| `ls` | Remote directory listing |
+| `get <file>` | Download to your **local current working directory** |
 
----
-
-## 🔚 Step 5: Disconnect and Verify
-
-After downloading, we exited the session:
-
-```bash
+```text
 exit
 ```
 
-Then confirmed the flag contents:
+---
+
+## Step 5 — Verify locally
 
 ```bash
 cat flag.txt
@@ -91,23 +75,20 @@ cat flag.txt
 
 ---
 
-## ✅ Summary Table
+## Summary
 
-| Step         | Command                                          | Description                          |
-|--------------|--------------------------------------------------|--------------------------------------|
-| Scan host    | `nmap -sV -sC -O 10.65.1.23`                     | Enumerate SMB + OS info              |
-| List shares  | `smbclient -L 10.1.0.10`                         | Enumerate SMB shares                 |
-| Connect      | `smbclient \\\\10.164.5.310\\WorkShare`         | Connect to custom share              |
-| List files   | `ls`                                             | Explore directory contents           |
-| Download     | `get flag.txt`                                   | Retrieve the flag file               |
-| Exit         | `exit`                                           | Close SMB session                    |
+| Step | Command | Note |
+|------|---------|------|
+| Scan | `nmap -sV -sC -O <TARGET_IP>` | Baseline SMB discovery |
+| List | `smbclient -N -L //<TARGET_IP>/` | Map shares |
+| Connect | `smbclient //<TARGET_IP>/WorkShare -N` | Anonymous/guest test |
+| Exfil | `get flag.txt` | Pull artifact |
 
 ---
 
-## 🧠 Key Lessons
+## Lessons
 
-- **SMB misconfigurations** are common in internal networks.
-- Anonymous access should **never** be allowed to sensitive shares.
-- Tools like `smbclient` make it easy to enumerate and exploit unsecured shares.
+- Anonymous read on custom shares is a **high** finding when data is sensitive.
+- Always align **one target IP** across notes—mixed IPs in raw logs confuse later review.
 
-Boom. Box done ✅
+**Status:** lab objectives completed.

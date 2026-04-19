@@ -1,135 +1,128 @@
-# 🧠 Linux Prompt Symbols + Bash Customization + Command Cheat Sheet
+# Linux prompts, `~/.bashrc`, and command reference
 
 ---
 
-## 🔑 Shell Prompt Symbols
+## Shell prompt symbols
 
-| Symbol | Meaning        |
-|--------|----------------|
-| `#`    | You are **root** (administrator) |
-| `$`    | You are a **normal user**        |
+| Symbol | Meaning |
+|--------|---------|
+| `#` | **root** (effective UID 0) — destructive commands affect the whole system |
+| `$` | Unprivileged user |
 
-These symbols appear at the start of your shell prompt and help you instantly know your privilege level.
+Some distributions use **`>`** for `fish` or custom `PS1` strings—always verify with `whoami` / `id` before running privileged commands.
 
 ---
 
-## 🎨 Customize Your Shell Prompt with `.bashrc`
+## Customize the prompt (`~/.bashrc`)
 
-The `.bashrc` file lets you change how your terminal looks and behaves.
+**Edit:**
 
-### 🔧 To edit:
 ```bash
 nano ~/.bashrc
 ```
 
-Add or modify the `PS1` variable to change your prompt style.
+Changes to **`PS1`** (and `PROMPT_COMMAND`) take effect in new shells, or immediately with:
 
-### 💡 Online Bash Prompt Generator:
-Create your own colored/custom bash prompt easily at:  
-🔗 [https://bash-prompt-generator.org](https://bash-prompt-generator.org)
+```bash
+source ~/.bashrc
+```
+
+**Generator (visual prompt builder):** [bash-prompt-generator.org](https://bash-prompt-generator.org)
 
 ---
 
-## 📚 Linux Command Cheat Sheet
+## Command cheat sheet
 
-Here's a list of commonly used Linux commands grouped by category:
-
-### 📂 File and Directory Management
+### Files and directories
 
 ```bash
-ls              # List directory contents
-pwd             # Print working directory
+ls              # List directory
+pwd             # Current directory
 cd <dir>        # Change directory
-mkdir <dir>     # Make new directory
-rm <file>       # Remove file
-rm -r <dir>     # Remove directory and contents
-cp <src> <dest> # Copy file or directory
-mv <src> <dest> # Move or rename file
-touch <file>    # Create empty file
-cat <file>      # View file contents
+mkdir <dir>     # Create directory
+rm <file>       # Remove file (irreversible)
+rm -r <dir>     # Remove directory tree — double-check path
+cp <src> <dest> # Copy
+mv <src> <dest> # Move/rename
+touch <file>    # Create empty file or update mtime
+cat <file>      # Print file (use `less` for large files)
 ```
 
-### 🔍 Searching and Finding
+### Search
 
 ```bash
-find / -name <file>        # Find files by name
-grep "text" <file>         # Search text in file
-grep -r "text" <directory> # Recursive grep
-locate <filename>          # Find file (uses database)
+find <path> -name '<pattern>'   # By name; narrow <path> first (avoid starting at / on huge disks)
+grep -R "text" <dir>            # Recursive content search
+locate <name>                   # Uses updatedb index — run sudo updatedb periodically
 ```
 
-### 🧠 Permissions and Ownership
+**QC:** `find /` from root is slow and can hammer network mounts—start under `/home`, `/etc`, or known app paths.
+
+### Permissions
 
 ```bash
-chmod +x <file>        # Make file executable
-chmod 755 <file>       # Set permissions
-chown user:user <file> # Change ownership
+chmod +x script.sh     # Execute bit
+chmod 755 script.sh    # rwxr-xr-x
+chown user:group file  # Ownership (requires root)
 ```
 
-### 🖥️ System Info
+### System info
 
 ```bash
-uname -a         # All system info
-hostname         # Show hostname
-df -h            # Disk space usage
-free -h          # RAM usage
-uptime           # System uptime
-top              # Active processes
-whoami           # Current user
-id               # Current user ID info
+uname -a    # Kernel / arch
+hostname    # Node name
+df -h       # Filesystem use
+free -h     # Memory
+uptime      # Load average
+top         # Interactive process view
+whoami      # Current user
+id          # UID/GID and groups
 ```
 
-### 🔧 Process and Service Control
+### Processes and services
 
 ```bash
-ps aux                # Show all running processes
-kill <pid>            # Kill process by PID
-killall <name>        # Kill process by name
-systemctl status      # Show system service status
-systemctl restart ssh # Restart a service (e.g., SSH)
+ps aux | head
+kill <pid>                 # SIGTERM single PID
+sudo systemctl status ssh  # Example unit status
+sudo systemctl restart ssh
 ```
 
-### 📦 Package Management (Debian/Ubuntu)
+### Debian/Ubuntu packages
 
 ```bash
-sudo apt update            # Refresh package lists
-sudo apt install <package> # Install a package
-sudo apt remove <package>  # Remove a package
-dpkg -l                    # List installed packages
+sudo apt update
+sudo apt install <pkg>
+sudo apt remove <pkg>
+dpkg -l | less
 ```
 
-### 🔐 User Management
+### Users (requires root for most)
 
 ```bash
-adduser <username>     # Add new user
-passwd <username>      # Set user password
-usermod -aG sudo <user> # Add user to sudo group
+sudo adduser <name>
+sudo passwd <name>
+sudo usermod -aG sudo <name>   # Debian/Ubuntu admin group
 ```
 
-### 🌐 Networking
+### Networking
 
 ```bash
-ip a                 # Show IP addresses
-ping <host>          # Ping a host
-netstat -tulnp       # Show listening ports
-ss -tuln             # Faster netstat alternative
-curl <url>           # HTTP requests
-wget <url>           # Download files
+ip a              # Addresses and interfaces
+ping -c3 <host>   # Limited ICMP test
+ss -tulnp         # Listening sockets + processes (modern `netstat`)
+curl -I <url>     # HTTP headers only
+wget <url>        # Download to file
 ```
 
 ---
 
-## ✅ Summary
+## Summary
 
-| Concept       | Description                                    |
-|---------------|------------------------------------------------|
-| `#` prompt    | Root shell                                     |
-| `$` prompt    | Normal user shell                              |
-| `.bashrc`     | Config file for shell behavior/customization   |
-| `PS1`         | Variable that sets how your prompt looks       |
-| Generator     | [bash-prompt-generator.org](https://bash-prompt-generator.org) |
-| Cheat Sheet   | Common Linux commands for daily operations     |
+| Item | Role |
+|------|------|
+| `#` / `$` | Quick privilege reminder (not a substitute for `id`) |
+| `~/.bashrc` | Per-user shell init and `PS1` |
+| Cheat sheet | Everyday navigation, search, services, and network triage |
 
----
-
-Use this sheet as a quick reference while navigating or customizing your Linux system.
+Keep this as a **quick reference**; prefer **`man <command>`** and **`tldr <command>`** on hosts where they are installed.

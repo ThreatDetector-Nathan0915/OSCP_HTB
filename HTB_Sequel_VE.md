@@ -1,96 +1,87 @@
-# 🐬 MariaDB SQL Server Walkthrough
+# MariaDB — empty `root` password (walkthrough)
 
-Okay so this one was a MariaDB SQL server, and tbh the nmap was taking forever to load — super annoying. Eventually, enumeration showed the SQL server running with port open and exposed. We decided to brute basic credentials to get access.
+The target exposes **MariaDB/MySQL** with **`root` and no password**—common in misconfigured training hosts. Always confirm scope and authorization before testing authentication bypass.
 
-## 🔍 Nmap Scan
+---
+
+## Port scan
 
 ```bash
 nmap -p- -sV 10.129.206.159
 ```
 
-Discovered an open MariaDB SQL service on the host.
+| Flag | Purpose |
+|------|---------|
+| `-p-` | Full TCP scan (MariaDB default **3306**, but verify) |
+| `-sV` | Service/version fingerprint |
 
-## 🔐 Logging In
+**QC:** If the scan is slow, run a top-port scan first (`--top-ports 1000`) then narrow to `-p 3306` once SQL is suspected.
 
-Tried the following common usernames:
+---
 
-- user  
-- admin  
-- administrator  
-- guest  
-- ✅ root (no password required)
-
-Command used:
+## Client login
 
 ```bash
 mysql -h 10.129.206.159 -u root -p
 ```
 
-Just hit enter when prompted for a password — logged in successfully as root.
+When prompted for a password, press **Enter** if the service accepts an empty password for `root`.
 
-## 🧭 SQL Enumeration
+| Flag | Purpose |
+|------|---------|
+| `-h` | Hostname/IP of database |
+| `-u root` | User account |
+| `-p` | Prompt for password (empty in this lab) |
 
-Once inside the MariaDB shell, we needed to map out what was available.
+---
 
-### Step 1: List All Databases
+## SQL enumeration
+
+### Databases
 
 ```sql
 SHOW DATABASES;
 ```
 
-Output:
-
-```
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| htb                |
-+--------------------+
-```
-
-We obviously chose to look into the `htb` database.
-
-### Step 2: Use the Target Database
+### Select application schema
 
 ```sql
 USE htb;
 ```
 
-### Step 3: List Tables in `htb`
+### Tables
 
 ```sql
 SHOW TABLES;
 ```
 
-Output:
-
-```
-+------------------+
-| Tables_in_htb    |
-+------------------+
-| config           |
-| users            |
-+------------------+
-```
-
-### Step 4: Dump Contents of `config`
+### Read candidate table (example)
 
 ```sql
 SELECT * FROM config;
 ```
 
-This revealed config settings — one of the entries contained the flag we were looking for.
+Adjust table names to match `SHOW TABLES` output for your run.
 
-## 📌 Command Summary
+---
+
+## Command cheat sheet
 
 ```sql
-SHOW DATABASES;        -- Lists all available databases
-USE htb;               -- Switch to HTB database
-SHOW TABLES;           -- Displays tables in the selected DB
-SELECT * FROM config;  -- Outputs all rows from config table
+SHOW DATABASES;        -- List databases
+USE htb;               -- Select database context
+SHOW TABLES;           -- List tables in current DB
+SELECT * FROM config;  -- Dump rows (use LIMIT in large tables)
 ```
 
-## ✅ Box Complete
+---
 
-Logged in using default root credentials. No password needed. Dumped the config table from the `htb` database and recovered the flag with zero resistance.
+## Summary
+
+| Step | Action |
+|------|--------|
+| Discovery | `nmap -p- -sV` → MariaDB/MySQL listening |
+| Access | `mysql -h … -u root -p` with empty password |
+| Objective | Query `htb` schema tables for flag material |
+
+**Status:** lab completed using default-empty `root` authentication (document hardening: `mysql_secure_installation`, host-based grants, network segmentation).

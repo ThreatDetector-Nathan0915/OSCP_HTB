@@ -1,10 +1,10 @@
-# 🧠 Git-Based Exploitation to Shell – Full Lab Writeup
+# Git-Based Exploitation to Shell – Full Lab Writeup
 
 This writeup outlines a complete kill chain starting from enumeration through a `.git` directory leak, leading to full shell access and credential reuse to escalate. It includes methodology, commands used, findings, and reasoning, formatted for clear reference and future replication.
 
 ---
 
-## 🔍 Step 1: Port Enumeration
+## Step 1: Port Enumeration
 
 We began by scanning the target for open services using `nmap`.
 
@@ -12,7 +12,7 @@ We began by scanning the target for open services using `nmap`.
 nmap -sV 192.168.X.X
 ```
 
-### 🔎 Results:
+### Results:
 - `22/tcp` → SSH (Open)
 - `80/tcp` → HTTP (Open)
 
@@ -20,7 +20,7 @@ This indicated a web application was running, as well as a potential SSH entry p
 
 ---
 
-## 🌐 Step 2: Web Enumeration via FFUF
+## Step 2: Web Enumeration via FFUF
 
 Using `ffuf`, we brute-forced common directories and files to discover hidden content on the web server.
 
@@ -28,14 +28,14 @@ Using `ffuf`, we brute-forced common directories and files to discover hidden co
 ffuf -w /usr/share/seclists/Discovery/Web-Content/common.txt -u http://192.168.X.X/FUZZ
 ```
 
-### 🧠 Discovery:
+### Discovery:
 - `.git/` directory was exposed publicly.
 
 This is a critical misconfiguration allowing us to potentially dump the entire source code of the web application.
 
 ---
 
-## 🧰 Step 3: Dumping the Git Repository
+## Step 3: Dumping the Git Repository
 
 We cloned and used a tool called [`git-dumper`](https://github.com/arthaud/git-dumper) to extract the full codebase from the `.git/` directory.
 
@@ -63,11 +63,11 @@ Now all project files were visible and searchable.
 
 ---
 
-## 🔑 Step 4: Credential Discovery
+## Step 4: Credential Discovery
 
 Within the restored PHP application files, we found hardcoded credentials and config values.
 
-### 🧾 Findings:
+### Findings:
 - **Usernames:** `dog`, `tiffany`
 - **Passwords:** Located in a PHP config file
 
@@ -75,7 +75,7 @@ These credentials were valid for logging into the application’s admin interfac
 
 ---
 
-## 🔐 Step 5: Backdrop CMS Admin Panel Access
+## Step 5: Backdrop CMS Admin Panel Access
 
 We logged into the **Backdrop CMS** admin panel using the discovered credentials.
 
@@ -86,11 +86,11 @@ Once authenticated, we enumerated the backend to determine the CMS version and a
 
 ---
 
-## 📦 Step 6: Weaponizing an Exploit
+## Step 6: Weaponizing an Exploit
 
 The CMS was determined to be vulnerable to **Backdrop CMS RCE via plugin upload**, documented on Exploit-DB:
 
-📎 [Exploit 52021 – Backdrop CMS RCE](https://www.exploit-db.com/exploits/52021)
+ [Exploit 52021 – Backdrop CMS RCE](https://www.exploit-db.com/exploits/52021)
 
 We cloned and modified the exploit to create a `.tar` plugin archive instead of a `.zip`, as the CMS only accepted `.tar` uploads.
 
@@ -115,7 +115,7 @@ We uploaded this file via the plugin manager in the CMS admin portal.
 
 ---
 
-## 🐚 Step 7: Reverse Shell Execution
+## Step 7: Reverse Shell Execution
 
 After plugin activation, we triggered the payload via the browser to execute a reverse shell command.
 
@@ -130,7 +130,7 @@ nc -lvnp 4444
 ```
 
 ### Trigger via browser:
-```
+```text
 http://192.168.X.X/path/to/revshell.php?cmd=<encoded_payload>
 ```
 
@@ -138,7 +138,7 @@ We caught a shell as `www-data`, the default web service user.
 
 ---
 
-## 🧭 Step 8: Post-Exploitation Enumeration
+## Step 8: Post-Exploitation Enumeration
 
 We began internal enumeration after catching the shell.
 
@@ -146,7 +146,7 @@ We began internal enumeration after catching the shell.
 cat /etc/passwd
 ```
 
-### 🧍 Users Discovered:
+### Users Discovered:
 - `root`
 - `jobert`
 - `johncusack`
@@ -159,7 +159,7 @@ find / -name '*.conf' 2>/dev/null
 
 ---
 
-## 🧬 Step 9: Privilege Escalation via Password Reuse
+## Step 9: Privilege Escalation via Password Reuse
 
 Within a local config file, we found valid root-level database credentials:
 
@@ -181,7 +181,7 @@ At this point, we had escalated to a more privileged user. Depending on sudo per
 
 ---
 
-## ✅ Endgame Summary
+## Endgame Summary
 
 | Phase             | Action / Tool                              | Result                                 |
 |------------------|---------------------------------------------|----------------------------------------|
@@ -197,7 +197,7 @@ At this point, we had escalated to a more privileged user. Depending on sudo per
 
 ---
 
-## 🔚 Final Notes
+## Final Notes
 
 This box reinforced the impact of:
 - Improper `.git/` exposure
@@ -207,4 +207,3 @@ This box reinforced the impact of:
 
 This end-to-end workflow can be easily repeated or adapted for similar CTFs or real-world pentests.
 
-Let me know if you want a zipped `.md` export with images or want to extend this to include privilege escalation to full root.

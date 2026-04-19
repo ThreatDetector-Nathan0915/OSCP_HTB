@@ -1,95 +1,104 @@
-# 🧭 Web Recon Walkthrough – Host 192.168.191.65
+# Web reconnaissance — host `192.168.191.65`
+
+Windows target with **IIS**, duplicate HTTP services, and **soft 404** behavior that breaks naive directory brute-forcing. Below: service map, browser recon, NSE scripts, and **`ffuf`** calibration.
 
 ---
 
-## 🔍 Step 1: Initial Service Enumeration
+## Step 1 — Service enumeration
 
-Performed a version scan using Nmap:
+**Command:**
 
 ```bash
 sudo nmap -sV 192.168.191.65
 ```
 
-### Output:
-```
-PORT     STATE SERVICE       VERSION
-21/tcp   open  ftp           Microsoft ftpd
-80/tcp   open  http          Microsoft IIS httpd 10.0
-135/tcp  open  msrpc         Microsoft Windows RPC
-139/tcp  open  netbios-ssn   Microsoft Windows netbios-ssn
-445/tcp  open  microsoft-ds?
-9998/tcp open  http          Microsoft IIS httpd 10.0
+| Detail | Purpose |
+|--------|---------|
+| `sudo` | May be required for certain scan types; here used for consistency with raw socket workflows |
+| `-sV` | Version detection for open ports |
+
+**Sample interpretation:**
+
+```text
+21/tcp   ftp      Microsoft ftpd
+80/tcp   http     Microsoft IIS 10.0
+135/tcp  msrpc
+139/tcp  netbios-ssn
+445/tcp  microsoft-ds
+9998/tcp http     Microsoft IIS 10.0
 ```
 
-**Target is a Windows server running IIS.**
+**Finding:** Windows server with **IIS** on **80** and **9998**.
 
 ---
 
-## 🌐 Step 2: Web Interface Investigation
+## Step 2 — Manual web review
 
-Browsed to both web ports in Firefox:
-
-- **Port 80**: Blank or default page.
-- **Port 9998**: Web login interface detected.
+- **Port 80:** default or blank IIS page.
+- **Port 9998:** login / application UI — primary manual test surface.
 
 ---
 
-## 🛡️ Step 3: Vulnerability Scan (NSE)
-
-Ran Nmap NSE scripts against known services but **no critical vulnerabilities** were returned:
+## Step 3 — Nmap NSE (`vuln` category)
 
 ```bash
 nmap --script vuln 192.168.191.65
 ```
 
----
+**Purpose:** runs **vulnerability-oriented** NSE scripts where they apply (SMB HTTP, etc.). **QC:** output can include **false positives**—correlate with version numbers and manual validation.
 
-## ❌ Step 4: Handling False Positives (404s Masked as 200s)
-
-During brute force attempts, noticed that invalid paths return:
-
-- **HTTP 200 OK**
-- But they are actually **404 errors** disguised with custom error page
-
-This breaks most brute force tools that rely on real `404 Not Found` responses.
+**Result (this host):** no high-confidence critical issues from scripts alone.
 
 ---
 
-## ✅ Step 5: FFUF to the Rescue
+## Step 4 — Soft 404 (HTTP 200 masking missing pages)
 
-Used `ffuf` with status code matching and forced size filtering to bypass the masked 404s:
+Invalid paths may return **HTTP 200** with a **fixed-size** error template. Tools that assume “404 means not found” will report **noise hits**.
+
+**Mitigation:** filter on **response length**, **word count**, or **regex** of stable template markers.
+
+---
+
+## Step 5 — `ffuf` with size filter
+
+**Command:**
 
 ```bash
 ffuf -u "http://192.168.191.65:9998/Interface/errors/404.html?aspxerrorpath=/FUZZ" \
--w raft-medium-files.txt -mc 200 -t 40 -fs 4845
+  -w raft-medium-files.txt -mc 200 -t 40 -fs 4845
 ```
 
-### Explanation:
-- `-u`: Target URL, using the server’s error handler
-- `-w`: Wordlist to brute-force paths (`raft-medium-files.txt`)
-- `-mc 200`: Only show responses with status code 200
-- `-fs 4845`: Filter out responses that always return the same length (false 404s)
-- `-t 40`: Threading to speed up discovery
+| Flag | Role |
+|------|------|
+| `-u` | URL; `FUZZ` marks injection point; here the app surfaces missing paths via `aspxerrorpath` |
+| `-w` | Wordlist (`raft-medium-files.txt` or SecLists equivalent) |
+| `-mc 200` | Only display HTTP 200 responses |
+| `-fs 4845` | **Hide** responses of size 4845 bytes (calibrated soft-404 body) |
+| `-t 40` | Concurrency |
+
+**QC:** Run **`ffuf` once with a known-bad path** to measure the decoy response size, then set `-fs` (or combine with `-fw` / regex filters per `ffuf` docs).
 
 ---
 
-## 📌 Summary
+## Summary
 
-| Phase        | Tool     | Result |
-|--------------|----------|--------|
-| Port Scan    | `nmap -sV` | Identified IIS & FTP on Windows |
-| Web Recon    | Firefox  | Port 9998 served a login page |
-| Vuln Scan    | Nmap NSE | No major issues detected |
-| Fuzzing      | ffuf     | Bypassed masked 404 pages using length filtering |
+| Phase | Tool | Outcome |
+|-------|------|---------|
+| Ports | `nmap -sV` | IIS + auxiliary services |
+| Browser | Manual | Login UI on **9998** |
+| Scripts | `nmap --script vuln` | No immediate critical hits |
+| Content discovery | `ffuf` | Bypass soft-404 using response size |
 
 ---
 
-## 🔜 Next Steps
+## Next steps
 
-- Analyze `ffuf` results for interesting endpoints
-- Test for file upload, RCE, or default credentials on login
-- Check FTP for anonymous access or weak creds:
-  ```bash
-  ftp 192.168.191.65
-  ```
+- Mine `ffuf` results for real ASPX/ASHX/AXD endpoints.
+- Test authentication, file upload, and deserialization issues on **9998**.
+- Enumerate **FTP** (`anonymous`, weak creds, writable `wwwroot`):
 
+```bash
+ftp 192.168.191.65
+```
+
+Use `binary` / `passive` as needed; log all actions for reporting.

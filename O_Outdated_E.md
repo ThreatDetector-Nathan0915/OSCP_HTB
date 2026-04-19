@@ -1,10 +1,10 @@
-# 🧪 Web Exploitation Walkthrough – Host 192.168.59.232
+# Web Exploitation Walkthrough – Host 192.168.59.232
 
 This walk-through shows how we went from basic enumeration → discovering an exposed PDF generator → fingerprinting it as **mPDF 6.0**, which is known to have vulnerabilities.
 
 ---
 
-## 🔍 Step 1: Full Port Scan
+## Step 1: Full Port Scan
 
 Ran an all-ports scan to identify exposed services:
 
@@ -13,7 +13,7 @@ nmap -p- 192.168.59.232 -vv
 ```
 
 ### Output Summary:
-```
+```text
 22/tcp     open     ssh
 80/tcp     open     http
 10000/tcp  open     snet-sensor-mgmt
@@ -23,7 +23,7 @@ nmap -p- 192.168.59.232 -vv
 
 ---
 
-## 🛠️ Step 2: Install FFUF for Web Directory Enumeration
+## Step 2: Install FFUF for Web Directory Enumeration
 
 Installed FFUF and a wordlist to begin fuzzing:
 
@@ -41,7 +41,7 @@ unzip SecLists.zip
 
 ---
 
-## 🔎 Step 3: Directory Fuzzing on Port 80
+## Step 3: Directory Fuzzing on Port 80
 
 Navigated to the SecLists directory and ran FFUF:
 
@@ -50,24 +50,24 @@ cd SecLists-master/Discovery/Web-Content
 ffuf -w common.txt -u "http://192.168.59.232/FUZZ" -e .php
 ```
 
-### ✅ FFUF Discovery:
+### FFUF Discovery:
 
 - `/config/` directory found
 - Inside it: `config.php`
 
 So the valid page becomes:
 
-```
+```text
 http://192.168.59.232/config/config.php
 ```
 
 ---
 
-## 📄 Step 4: Analyzing the Web App
+## Step 4: Analyzing the Web App
 
 The main site functions as a **PDF converter**. Likely vulnerable if using an outdated library.
 
-### 🛠️ Use `exiftool` to Inspect Generated PDF
+### Use `exiftool` to Inspect Generated PDF
 
 Downloaded a sample PDF and checked its metadata:
 
@@ -76,7 +76,7 @@ exiftool mpdf.pdf
 ```
 
 ### Output:
-```
+```text
 Producer: mPDF 6.0
 ...
 ```
@@ -85,7 +85,7 @@ Producer: mPDF 6.0
 
 ---
 
-## 🧨 Step 5: Look for Known Vulnerabilities in mPDF 6.0
+## Step 5: Look for Known Vulnerabilities in mPDF 6.0
 
 Now that we’ve fingerprinted the PDF generation engine, we can research public exploits or known vulnerabilities.
 
@@ -97,7 +97,7 @@ Now that we’ve fingerprinted the PDF generation engine, we can research public
 
 ---
 
-## 🔜 Next Steps
+## Next Steps
 
 1. Search Exploit-DB and GitHub for **mPDF 6.0 vulnerabilities**
 2. Attempt **payload injection** in fields like headers or PDF body
@@ -106,7 +106,7 @@ Now that we’ve fingerprinted the PDF generation engine, we can research public
 
 ---
 
-## 🧠 Summary
+## Summary
 
 | Phase            | Tool/Action                               | Result                        |
 |------------------|--------------------------------------------|-------------------------------|
@@ -117,4 +117,4 @@ Now that we’ve fingerprinted the PDF generation engine, we can research public
 
 ---
 
-Let me know when you're ready to weaponize the mPDF or want help building payloads against the converter.
+Next: weaponize the mPDF issue or build converter-specific payloads according to the lab brief and legal scope.

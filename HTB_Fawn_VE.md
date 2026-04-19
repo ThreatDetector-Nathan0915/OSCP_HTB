@@ -1,82 +1,68 @@
-# 📁 FTP Anonymous Access – Full Walkthrough
+# FTP anonymous access (walkthrough)
 
-This writeup outlines a simple exploitation scenario involving anonymous FTP access, starting with basic enumeration and leading to successful file retrieval.
+Anonymous **FTP** allows unauthenticated read (sometimes write) access—common in legacy labs and a **high-impact** finding if data is sensitive.
 
 ---
 
-## 🔍 Step 1: Nmap Scan for Enumeration
+## Step 1 — Nmap
 
-We used a comprehensive `nmap` scan with service detection, default scripts, and OS guessing:
+**Command:**
 
 ```bash
 nmap -sV -sC -O 10.129.201.243
 ```
 
-### 🔎 Flags Explained:
-- `-sV` → Detect service versions
-- `-sC` → Run default NSE scripts for more info
-- `-O` → Attempt OS fingerprinting
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Version detection |
+| `-sC` | Default NSE scripts (often report `ftp-anon`, banner text) |
+| `-O` | OS fingerprint (may be blocked or inaccurate; adds packets) |
+
+**Finding:** **TCP 21** — FTP with **anonymous login allowed** (confirm exact banner/script output in your scan).
 
 ---
 
-## ✅ Step 2: FTP Discovered with Anonymous Login
+## Step 2 — Connect with `ftp`
 
-The scan output revealed:
-
-- **Port:** `21/tcp`
-- **Service:** `ftp`
-- **Access:** `Anonymous login allowed`
-
-> Anonymous access means anyone can connect to the FTP server without credentials, typically using `anonymous` as the username.
-
----
-
-## 📂 Step 3: Accessing the FTP Server
-
-Connect using the `ftp` client:
+**Client:**
 
 ```bash
 ftp 10.129.201.243
 ```
 
-When prompted for credentials:
-- **Username:** `anonymous`
-- **Password:** *press Enter*
+**Credentials:**
 
-Once connected, list files:
+- Username: `anonymous`
+- Password: usually **guest e-mail** or **blank** (press Enter)—follow server prompt text.
 
-```bash
-ls
+**Inside the client:**
+
+```text
+ls          # list remote directory
+get flag.txt   # download file to local CWD
 ```
 
-If `flag.txt` is visible, download it:
-
-```bash
-get flag.txt
-```
-
-File is saved to your current local directory.
+| Command | Purpose |
+|---------|---------|
+| `ls` | List remote files (implementation may use `LIST` or `NLST`) |
+| `get <file>` | Download a single file |
 
 ---
 
-## 🧠 Takeaways
+## Takeaways
 
-- FTP servers allowing anonymous login are a **major security risk**.
-- Default scripts (`-sC`) during Nmap enumeration often catch these open doors.
-- Always check for anonymous access on open FTP ports.
-
----
-
-## 📌 Summary Table
-
-| Step         | Command                                | Description                          |
-|--------------|----------------------------------------|--------------------------------------|
-| Port scan    | `nmap -sV -sC -O 10.129.201.243`       | Enumerates services, OS, scripts     |
-| Connect FTP  | `ftp 10.129.201.243`                   | Launch FTP client                    |
-| Login        | `anonymous` / (no password)            | Use default anonymous creds          |
-| List files   | `ls`                                   | View FTP directory contents          |
-| Download     | `get flag.txt`                         | Retrieve target file                 |
+- Anonymous FTP is a **misconfiguration** when the share contains non-public data.
+- Nmap **`-sC`** frequently surfaces anonymous FTP without manual banner grabs.
+- Prefer **`lftp`** or **`curl -u anonymous:`** for scripting; classic `ftp` is fine for quick labs.
 
 ---
 
-This is a classic low-hanging fruit example—useful for beginners to understand real-world misconfigurations.
+## Summary
+
+| Step | Command | Note |
+|------|---------|------|
+| Scan | `nmap -sV -sC -O 10.129.201.243` | Confirms FTP + scripts |
+| Connect | `ftp 10.129.201.243` | `anonymous` / blank |
+| Retrieve | `get flag.txt` | Saves locally |
+
+This pattern illustrates **exposed legacy services**—always verify whether anonymous read/write is intended before closing a finding.

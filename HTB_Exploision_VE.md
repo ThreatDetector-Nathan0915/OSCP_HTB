@@ -1,73 +1,81 @@
-# 🖥️ RDP Exploitation – No Password Admin Access
+# RDP — empty password on built-in administrator (lab)
 
-This was a straightforward but satisfying win exploiting an unauthenticated RDP configuration.
+Misconfigured **Remote Desktop** can allow interactive logon when the **`Administrator`** account has **no password** (or a trivial password) and policy does not block it. This is **critical** severity on real networks; here it is documented as a controlled lab exercise.
 
 ---
 
-## 🔍 1. Nmap Enumeration
+## 1. Port scan
 
-Initial scan revealed that **RDP (Remote Desktop Protocol)** was open on the target:
+**Command:**
 
 ```bash
 nmap -sV -p- <target-ip>
 ```
 
-**Result:**
-- `3389/tcp open microsoft-rdp`
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Service/version on each open port |
+| `-p-` | Full TCP range (use top-1000 first on wide scans to save time) |
+
+**Expected:** `3389/tcp open microsoft-rdp` (or equivalent RDP stack string).
+
+Replace `<target-ip>` with the lab address.
 
 ---
 
-## 🧰 2. Tool Used: `xfreerdp`
+## 2. `xfreerdp` usage
 
-Queried help menu to view available options:
+**Help:**
 
 ```bash
 xfreerdp --help
 ```
 
-This confirmed the necessary flags to attempt login:
-- `/u:` – sets the username
-- `/v:` – sets the target host
+Common switches for quick tests:
+
+| Switch | Meaning |
+|--------|---------|
+| `/u:<user>` | Username |
+| `/v:<host>` | Target host or IP |
+| `/p:<password>` | Password (omit to be prompted) |
+| `/cert:ignore` | Skip cert validation (**lab only**; unsafe otherwise) |
 
 ---
 
-## 🔑 3. Attempted Login with No Password
-
-Tried connecting to the RDP service as `administrator` with **no password**:
+## 3. Connect with empty password
 
 ```bash
 xfreerdp /u:administrator /v:10.129.1.13
 ```
 
-Just **hit enter** when prompted for a password — and it **worked**.
+When prompted for a password, **press Enter** if the account truly has no password (lab condition).
+
+**QC:** On modern Windows, empty-password network logons are usually **blocked** by policy—this behavior is **CTF/lab specific**. Document GPO expectations (`MinimumPasswordLength`, `LimitBlankPasswordUse`) for comparison.
 
 ---
 
-## 🖼️ 4. Remote GUI Access & Flag Retrieval
+## 4. Post-access
 
-Once the GUI session spawned, it dropped us into a full desktop environment.
-
-- Navigated to `Desktop`
-- Found the **flag.txt**
-- Opened it, captured the flag, and completed the box
+- Use the remote desktop session to open **`flag.txt`** (or equivalent) from the user profile / Desktop as instructed.
+- Do not enable RDP or weaken production hosts to reproduce this.
 
 ---
 
-## ✅ Summary
+## Summary
 
-| Step               | Command                                      | Description                              |
-|--------------------|----------------------------------------------|------------------------------------------|
-| Port Discovery     | `nmap -sV -p- <target-ip>`                   | Found RDP on port 3389                   |
-| Help Menu          | `xfreerdp --help`                           | Checked usage options                    |
-| RDP Login Attempt  | `xfreerdp /u:administrator /v:<target-ip>`  | Connected with no password               |
-| Capture Flag       | *GUI login success*                         | Retrieved flag from Desktop              |
+| Step | Command | Description |
+|------|---------|-------------|
+| Discovery | `nmap -sV -p- <target-ip>` | Locate RDP (`3389`) |
+| Client help | `xfreerdp --help` | Confirm syntax |
+| Logon | `xfreerdp /u:administrator /v:<target-ip>` | Empty password attempt |
+| Objective | GUI | Retrieve flag per lab |
 
 ---
 
-## 🔐 Lessons Learned
+## Lessons learned
 
-- RDP can be **completely exposed** if no password is set
-- `xfreerdp` is a quick and reliable tool for RDP enumeration & access
-- Always check GUI desktops for easy flag placement
+- RDP exposure + weak **`Administrator`** posture = full GUI compromise.
+- **`xfreerdp`** is a standard Linux RDP client for testing and operator access.
+- In assessments, pair this finding with **local security policy** export and **patch** level evidence.
 
-**Another box down. Easy day. ✅**
+**Status:** lab completed.

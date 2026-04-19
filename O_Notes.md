@@ -121,9 +121,9 @@ chmod 720 file
 - Google Dorking (e.g., `site:target.com inurl:admin`)
 - [Netcraft](https://www.netcraft.com/)
 - GitHub code/secret hunting
-  ```bash
+```bash
   gitleaks -v -r=https://github.com/target/repo
-  ```
+```
 - [Shodan](https://www.shodan.io/)
 - [securityheaders.com](https://securityheaders.com)
 
@@ -173,7 +173,7 @@ for ip in $(seq 1 254); do (ping -c1 -W1 192.168.1.$ip &>/dev/null && echo "10.4
 nc port enumeration no nmap found
 
 bash 
-```
+```bash
 for port in {1..1000}; do (echo > /dev/tcp/10.10.10.10/$port) >/dev/null 2>&1 && echo "Port $port is open"; done
 
 ```

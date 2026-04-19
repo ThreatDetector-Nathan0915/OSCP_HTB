@@ -203,7 +203,7 @@ Edit
 http://planning.htb:5555
 Login with the discovered credentials.
 
-🐚 Reverse Shell via Cron Panel
+ Reverse Shell via Cron Panel
 Within the cron UI, we created a new job or modified an existing one to run this reverse shell:
 
 bash

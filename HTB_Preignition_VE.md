@@ -1,71 +1,78 @@
-# 🗂️ Gobuster + Weak Login – Simple Web Exploit
+# Gobuster and weak default credentials
 
-This box was a textbook example of directory brute-forcing combined with weak credential hygiene.
+Directory discovery with **Gobuster** plus **`admin` / `admin`** on a hidden admin endpoint—a common training pattern for **default credential** and **sensitive path** failures.
 
 ---
 
-## 🔍 1. Nmap Enumeration
+## 1. Port scan
 
-Began with a version and service scan:
+**Command:**
 
 ```bash
 nmap -sV 10.129.121.8
 ```
 
-**Findings:**
-- Port `80/tcp` open — running HTTP web server
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Service and version detection on each open port |
+
+**Finding:** **TCP 80** — HTTP service.
+
+**QC:** For unknown scope, start with `-Pn` if ICMP is filtered, or a top-port scan before full `-p-`.
 
 ---
 
-## 📂 2. Web Directory Enumeration with Gobuster
+## 2. Directory brute force
 
-Used `gobuster` to brute force accessible directories:
+**Command:**
 
 ```bash
 gobuster dir -u http://10.129.121.8 -w /usr/share/wordlists/dirb/common.txt
 ```
 
-**Result:**
-- Found `/admin.php` – returned a **200 OK** response
+| Flag | Purpose |
+|------|---------|
+| `dir` | HTTP path discovery mode |
+| `-u` | Base URL (include `http://` or `https://`) |
+| `-w` | Wordlist file |
+
+**Finding:** **`/admin.php`** returned **HTTP 200** — manually review in browser (not every 200 is a real admin panel; some apps return soft 404s).
 
 ---
 
-## 🔐 3. Default Credentials Exploit
+## 3. Default credentials
 
-Navigated to `http://10.129.121.8/admin.php`, which presented a login form.
-
-Tried default web credentials:
+At `http://10.129.121.8/admin.php`, the login form accepted:
 
 ```text
 Username: admin
 Password: admin
 ```
 
-**It worked.** Immediate access to the admin panel.
+**Lesson:** enforce password policy, disable unused admin accounts, and protect admin paths with **network controls** and **MFA** where applicable.
 
 ---
 
-## 🏁 4. Post-Login
+## 4. Post-login
 
-Once inside the panel:
-- Retrieved flag or executed post-auth steps (depending on the lab)
-
----
-
-## ✅ Summary
-
-| Step               | Command                                                              | Result                            |
-|--------------------|----------------------------------------------------------------------|-----------------------------------|
-| Nmap Enum          | `nmap -sV 10.129.121.8`                                              | Found HTTP on port 80             |
-| Gobuster Scan      | `gobuster dir -u http://10.129.121.8 -w common.txt`                 | Found `/admin.php`                |
-| Web Login Attempt  | Used `admin:admin`                                                   | Successfully authenticated        |
+Complete the lab objectives (flag submission, configuration review, or hardening tasks as specified by HTB).
 
 ---
 
-## 🧠 Lessons Learned
+## Summary
 
-- **Gobuster** is critical for catching hidden pages.
-- **Default creds** are still dangerous and commonly overlooked.
-- Check status codes — 200s are always worth a visit.
+| Step | Command / action | Result |
+|------|------------------|--------|
+| Scan | `nmap -sV 10.129.121.8` | HTTP on port 80 |
+| Content discovery | `gobuster dir -u http://10.129.121.8 -w …/common.txt` | `/admin.php` |
+| Auth | `admin` / `admin` | Authenticated admin session |
 
-**Box complete. Easy and clean. ✅**
+---
+
+## Takeaways
+
+- **Gobuster** (or `feroxbuster`, `ffuf`) quickly surfaces hidden PHP/HTML routes.
+- **Default credentials** remain a valid test case on appliances and internal apps.
+- Always record **HTTP status**, **title**, and **response length** to avoid false positives.
+
+**Status:** lab objectives completed.

@@ -1,21 +1,25 @@
-# FTP 
-File transfer protocol is often used to share files within an org, it operaters on the application layer, similar to HTTP. Runs natively on port 21. TFTP is simpler than FTP (trivial) and it runs on UDP far more insicure than FTP.
-```
-Commands	Description
-connect	Sets the remote host, and optionally the port, for file transfers.
-get	Transfers a file or set of files from the remote host to the local host.
-put	Transfers a file or set of files from the local host onto the remote host.
-quit	Exits tftp.
-status	Shows the current status of tftp, including the current transfer mode (ascii or binary), connection status, time-out value, and so on.
-verbose	Turns verbose mode, which displays additional information during file transfer, on or off.
+## FTP and TFTP
+
+**FTP** is commonly used to move files inside organizations (**TCP/21**, often with TLS as FTPS). **TFTP** is minimal, usually **UDP/69**, with no real authentication—treat TFTP as **read/write sensitive** if exposed.
+
+**TFTP client commands** (interactive `tftp` prompt):
+
+```text
+Command    Description
+connect    Set remote host (and optional port) for transfers
+get        Pull file(s) from remote to local
+put        Push file(s) from local to remote
+quit       Exit tftp
+status     Show mode (ascii/binary), connection state, timeouts, etc.
+verbose    Toggle extra transfer logging
 ```
 
-Default conf path to see what settings are availeble can be found at **/etc/vsftpd.conf**.
+Default configuration path to inspect available settings: **/etc/vsftpd.conf**.
 
-Default location where users are defined to be able to user FTP-
-**/etc/ftpusers**
-**Dangerous Settings**
-```
+Default file listing users blocked from FTP: **/etc/ftpusers**
+
+**Dangerous `vsftpd` settings**
+```text
 anonymous_enable=YES	Allowing anonymous login?
 anon_upload_enable=YES	Allowing anonymous to upload files?
 anon_mkdir_write_enable=YES	Allowing anonymous to create new directories?
@@ -23,11 +27,21 @@ no_anon_password=YES	Do not ask anonymous for password?
 anon_root=/home/username/ftp	Directory for anonymous.
 write_enable=YES	Allow the usage of FTP commands: STOR, DELE, RNFR, RNTO, MKD, RMD, APPE, and SITE?
 ```
-if anon login is allowed the following command can be used to dowload all files
+If anonymous login is allowed, you can mirror the share with **`wget`**:
+
 ```bash
- wget -m --no-passive ftp://anonymous:anonymous@10.129.14.136
+wget -m --no-passive ftp://anonymous:anonymous@10.129.14.136
 ```
-# SMB Shares
+
+| Flag | Purpose |
+|------|---------|
+| `-m` | **Mirror** recursively |
+| `--no-passive` | Use **active** FTP (PORT) mode—needed when the server cannot reach your passive data port |
+
+**QC:** Replace the IP with your target; anonymous credentials must be allowed server-side.
+
+## SMB shares
+
 ```bash
 └─$ sudo nmap -sC -sV  10.129.202.5 
 445/tcp  open  netbios-ssn Samba smbd 4
@@ -58,41 +72,53 @@ netname: sambashare
 rpcclient $> exit
 ```
 
-# nfs
+## NFS
 
-``bash                                                                                                                     
-┌──(kali㉿kali)-[~]
+**Nmap** (NFS scripts + `rpcbind` / NFS ports):
+
+```bash
+┌──(kali@kali)-[~]
 └─$ sudo nmap --script nfs* 10.129.202.5 -sV -p111,2049
 ```
 
+| Part | Purpose |
+|------|---------|
+| `--script nfs*` | Runs **nfs-ls**, **nfs-showmount**, **nfs-statfs**, etc., where applicable |
+| `-p111,2049` | **portmapper** and **NFS**; add `20048` if you use NFSv4-only layouts |
+
+**Exports** (what the server allows clients to mount):
+
 ```bash
-─$ showmount -e 10.129.202.5                          
+showmount -e 10.129.202.5
+```
+
+```text
 Export list for 10.129.202.5:
 /var/nfs      10.0.0.0/8
 /mnt/nfsshare 10.0.0.0/8
 ```
 
-```bash 
-┌──(kali㉿kali)-[~]
-└─$ sudo mount -t nfs 10.129.202.5:/var/nfs ./target -o nolock                                                                               
-┌──(kali㉿kali)-[~]
-└─$ sudo mount -t nfs 10.129.202.5:/mnt/nfsshare ./target -o nolock                                                                                                                                            
-┌──(kali㉿kali)-[~]
-└─$ cd target                                                                                                                                   
-┌──(kali㉿kali)-[~/target]
+**Mount** (create `./target` first: `mkdir -p ./target`):
+
+```bash
+┌──(kali@kali)-[~]
+└─$ sudo mount -t nfs 10.129.202.5:/var/nfs ./target -o nolock
+┌──(kali@kali)-[~]
+└─$ sudo mount -t nfs 10.129.202.5:/mnt/nfsshare ./target -o nolock
+┌──(kali@kali)-[~]
+└─$ cd target
+┌──(kali@kali)-[~/target]
 └─$ tree .
 └── flag.txt
 1 directory, 1 file
 ```
 
 # DNS
-Doing xone transfers can expose local hosts DNS servers on a internal network
 
+Zone transfers can expose internal hostnames when DNS servers are misconfigured.
 
+### DNS brute forcing (puredns)
 
-
-
-DNS bruteforceing install puredns
 ```bash
 sudo apt install golang -y
 go install github.com/d3mondev/puredns/v2@latest
@@ -105,7 +131,7 @@ make
 sudo cp bin/massdns /usr/local/bin/
 ```
 
-Puredns command to bruteforce subdomain quickly
+Puredns command to bruteforce subdomains quickly:
 ```bash
 puredns bruteforce /home/kali/SecLists-master/Discovery/DNS/combined_subdomains.txt \
   inlanefreight.htb \
@@ -115,7 +141,7 @@ puredns bruteforce /home/kali/SecLists-master/Discovery/DNS/combined_subdomains.
   --skip-sanitize \
   -w resolved.txt
 ```
-**other bruteforce**
+**Other brute-force tools**
 ```bash
 dnsrecon -d inlanefreight.htb -n 10.129.203.75 -D /home/kali/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt -t brt
 
@@ -133,7 +159,7 @@ amass enum -d inlanefreight.htb -brute -recursive -w dns-Jhaddix.txt
 └─$ dig @10.129.203.75 internal.inlanefreight.htb AXFR
 └─$ dig axfr internal.inlanefreight.htb @10.129.203.75
 ```
-**Reverse lookuup a domain name**
+**Reverse lookup (domain name)**
 ```bash
 dig +short app.inlanefreight.htb @10.129.154.35
 ```
@@ -149,7 +175,7 @@ The module also highlights the danger of open relay configurations, which allow 
 Overall, the module teaches how SMTP misconfigurations can expose internal usernames, employee accounts, and infrastructure details, making SMTP a valuable early foothold during penetration testing and internal network assessments.
 
 **Key Commands to run on SMTP**
-```
+```text
 Command	Usage	Description
 HELO	HELO <hostname>	Initiates the SMTP session and identifies the client to the server.
 EHLO	EHLO <hostname>	Extended HELO; lists supported ESMTP features (AUTH, STARTTLS, SIZE, etc.).
@@ -165,16 +191,18 @@ NOOP	NOOP	Sends a keep-alive request to prevent session timeout.
 QUIT	QUIT	Terminates the SMTP session gracefully.
 HELP	HELP	Requests a list of supported SMTP commands (often disabled).
 ```
-**Typical responces**
-```
-🔑 Key Response Codes (Quick Reference)
+**Typical responses**
+
+**Key response codes (quick reference)**
+
+```text
 Code	Meaning
 250	Requested action completed successfully
 252	User exists but verification is restricted
 354	Server ready to receive message data
 550	Mailbox does not exist / access denied
 503	Bad command sequence
-502	Command not implemented\
+502	Command not implemented
 ```
 
 **Banner Grab SMTP version**
@@ -225,14 +253,20 @@ This confirmed an internal mail infrastructure using the `inlanefreight.htb` dom
 
 ---
 
-## 2. IMAPS Enumeration with curl (Banner + Auth Validation)
-You connected to IMAPS using curl:
+## 2. IMAPS enumeration with `curl`
 
 ```bash
 curl -k imaps://10.129.1.2 --user robin:robin -v
 ```
+
+| Flag | Purpose |
+|------|---------|
+| `-k` | Allow **insecure** TLS (self-signed / mismatched cert—lab only) |
+| `imaps://host` | IMAP over TLS scheme |
+| `--user user:pass` | PLAIN login after TLS starts |
+| `-v` | Verbose: shows TLS handshake, server capabilities, and errors |
 Results:
-```
+```text
 TLS handshake succeeded
 Authentication succeeded
 IMAP server greeting banner displayed a flag:
@@ -240,83 +274,102 @@ HTB{roncfbw7iszerd7shni7jr2343zhrj}
 ```
 
 Mailbox listing revealed:
-```
+
+```text
 INBOX
 DEV
 DEV.DEPARTMENT
 DEV.DEPARTMENT.INT
-This confirmed:
-Credentials are valid
-IMAP is accessible
-The interesting mailbox is not INBOX
 ```
 
-3. IMAP Interactive Session (Protocol-Correct Enumeration)
-You switched to an interactive IMAP session using OpenSSL:
+**Interpretation:** credentials work; IMAP is usable; sensitive mail is unlikely to be only in `INBOX`.
+
+---
+
+## 3. IMAP over TLS — interactive session (`openssl s_client`)
 
 ```bash
 openssl s_client -connect 10.129.1.2:993 -crlf -quiet
 ```
-Then executed proper IMAP commands:
-```
+
+| Flag | Purpose |
+|------|---------|
+| `-connect IP:993` | IMAPS |
+| `-crlf` | Send CRLF line endings (many IMAP servers expect this) |
+| `-quiet` | Reduce noise while keeping a usable session |
+
+**Commands to paste:**
+
+```text
 A1 LOGIN robin robin
 A2 LIST "" *
 ```
-This again confirmed the mailboxes:
-```
+
+**Mailbox excerpt:**
+
+```text
 INBOX
 DEV.DEPARTMENT.INT
 ```
-4. Inbox Check (Empty)
-You selected the INBOX:
-```
-A3 SELECT INBOX
-Response showed:
-0 EXISTS
-```
-Meaning no emails were stored in INBOX.
 
-5. Selecting the Internal Department Mailbox
-You correctly selected the internal mailbox:
-```bash
+---
+
+## 4. `INBOX` empty
+
+```text
+A3 SELECT INBOX
+```
+
+Expect **`0 EXISTS`** when there is no mail in `INBOX`.
+
+---
+
+## 5. Select internal mailbox
+
+```text
 A4 SELECT DEV.DEPARTMENT.INT
 ```
-Response showed:
-1 EXISTS
-```
-Meaning one email is present in this mailbox.
 
-6. Reading the Email Header
-You fetched the email headers:
-```
+Expect **`1 EXISTS`** when one message is stored.
+
+---
+
+## 6. Fetch headers
+
+```text
 A5 FETCH 1 BODY[HEADER]
-Header contents:
-yaml
-Copy code
+```
+
+**Example header (lab):**
+
+```text
 Subject: Flag
 To: Robin <robin@inlanefreight.htb>
 From: CTO <devadmin@inlanefreight.htb>
 Date: Wed, 03 Nov 2021 16:13:27 +0200
-This revealed:
-Internal admin email address: devadmin@inlanefreight.htb
-The email is explicitly titled “Flag”
-```
-7. Reading the Email Body (Actual Flag)
-You then fetched the email body:
-```A6 FETCH 1 BODY[TEXT]
-Email body contained the actual required flag:
-HTB{983uzn8jmfgpd8jmof8c34n7zio}```
-8. Final Result
-The correct flag retrieved from inside the IMAP email body is:
-```HTB{983uzn8jmfgpd8jmof8c34n7zio}
-Key Takeaways
-Banner flags ≠ task flags (HTB often differentiates)
 ```
 
-INBOX may be empty; enumerate all mailboxes
-Use protocol-correct commands (IMAP ≠ POP3)
-Internal mailboxes often contain sensitive data
-Fetching BODY[TEXT] is required to read actual message content
+---
+
+## 7. Fetch body (submission flag)
+
+```text
+A6 FETCH 1 BODY[TEXT]
+```
+
+**QC:** A token shown at **login/banner** can differ from the **email body** flag—submit the value the exercise asks for.
+
+**Example body flag (lab):** `HTB{983uzn8jmfgpd8jmof8c34n7zio}`
+
+---
+
+## Mail enumeration takeaways
+
+- Enumerate **all** mailboxes; operations mail often sits off `INBOX`.
+- Use **IMAP** verbs on **993/TLS**; do not mix POP3 commands.
+- Use `BODY[TEXT]` (or `BODY[]`) when you need full message content.
+
+---
 
 **SNMP**
 The SNMP module explains how the Simple Network Management Protocol is used to monitor and manage networked devices such as routers, switches, servers, and IoT systems. SNMP operates primarily over UDP port 161 for queries and configuration changes, while traps are sent asynchronously from servers to clients over UDP port 162 when specific events occur. Central to SNMP is the Management Information Base (MIB), a standardized, hierarchical structure written in ASN.1 that defines Object Identifiers (OIDs). OIDs uniquely identify pieces of information on a device and allow clients to query system details in a consistent way across vendors.
@@ -325,13 +378,20 @@ The module compares SNMP versions, highlighting that SNMPv1 and SNMPv2c lack enc
 
 From an offensive perspective, the module demonstrates how misconfigurations—such as default or weak community strings and read/write access—can expose sensitive system information. Tools like snmpwalk, onesixtyone, and braa are used to enumerate OIDs, brute-force community strings, and extract data such as hostnames, installed software, and administrator contact details. The module emphasizes that SNMP can be both a powerful administrative tool and a serious security risk when improperly configured.
 
-SNMP walk was able to enumerate the version of SNMP, the admin contact and a custom script that was running on a server. Very powerfull enumeration tool.
+`snmpwalk` enumerates the **MIB tree** when a **community string** (here `public`) is accepted.
 
 ```bash
 snmpwalk -v2c -c public 10.129.192.69
 ```
 
-# My SQL
+| Flag | Purpose |
+|------|---------|
+| `-v2c` | SNMP **v2c** (community-string auth, no encryption) |
+| `-c public` | **Read community** string (labs often use `public`/`private`) |
+
+**QC:** Read-only community still leaks topology; **read-write** (`private`) is critical. Prefer **SNMPv3** (`snmpwalk -v3 …`) on production systems.
+
+# MySQL
 This section covers MySQL service enumeration and basic database interaction from a penetration testing perspective. MySQL is a widely used open-source relational database management system that follows a client-server model, commonly deployed in LAMP/LEMP stacks to store application data such as users, credentials, emails, and customer records. Because databases often contain sensitive information, misconfigurations—such as weak credentials or external exposure—can lead to serious security risks.
 
 During enumeration, MySQL services are typically identified on TCP port 3306 using tools like Nmap, which can reveal version information, authentication plugins, and potential misconfigurations. However, scan results must always be manually validated, as false positives are common. Once valid credentials are obtained, attackers can authenticate using the MySQL client and enumerate databases, tables, and columns using standard SQL commands like SHOW DATABASES, USE, and SELECT.
@@ -340,7 +400,7 @@ In this assessment, weak credentials (robin:robin) allowed successful access to 
 .
 
 This exercise demonstrates how weak authentication and exposed database services can directly lead to sensitive data disclosure.
-``` python
+```python
 # MySQL Enumeration & Data Extraction – Command List
 
 # Scan MySQL service and enumerate version/auth info
@@ -474,7 +534,7 @@ Tools such as Metasploit’s ipmi_dumphashes module can retrieve these hashes, w
 Because the vulnerability is inherent to the IPMI specification, mitigation relies on strong, unique passwords, strict network segmentation, and limiting access to BMC interfaces. IPMI should always be assessed during internal penetration tests due to its prevalence and high-impact risk.
 
 
-```metsploit
+```text
 msf6 > use auxiliary/scanner/ipmi/ipmi_dumphashes
 msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) > set RHOSTS 10.129.165.125
 RHOSTS => 10.129.165.125
@@ -486,14 +546,14 @@ msf6 auxiliary(scanner/ipmi/ipmi_dumphashes) >
 ```
 
 ```bash
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ echo "5fb6b4368200000014169993b700e0247cf284945e641d04fc2fa8c1a843571ea630f7c4cf0881cfa123456789abcdefa123456789abcdef140561646d696e:af7111ffff02850dacc29c9ac2e18868f97ab6fd" > password.txt
                                    
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ cat password.txt        
 5fb6b4368200000014169993b700e0247cf284945e641d04fc2fa8c1a843571ea630f7c4cf0881cfa123456789abcdefa123456789abcdef140561646d696e:af7111ffff02850dacc29c9ac2e18868f97ab6fd
                                     
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ hashcat -m 7300 password.txt /usr/share/wordlists/rockyou.txt 
 hashcat (v6.2.6) starting
 ```
@@ -616,7 +676,7 @@ HTB{7nrzise7hednrxihskjed7nzrgkweunj47zngrhdbkjhgdfbjkc7hgj}
 ```
 # Footprinting Lab2
 ```bash
-┌──(kali㉿kali)-[~]
+┌──(kali@kali)-[~]
 └─$ cat important.txt                      
 sa:87N1ns@slls83      
 
@@ -667,7 +727,7 @@ Host script results:
 Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
 Nmap done: 1 IP address (1 host up) scanned in 103.92 seconds
 
-─(kali㉿kali)-[~]
+─(kali@kali)-[~]
 └─$ sudo cat target/ticket4238791283782.
  2    host=smtp.web.dev.inlanefreight.htb
  3    #port=25
@@ -701,11 +761,10 @@ ORDER BY TABLE_NAME;
 
 SELECT TOP 200 * FROM dbo.devsacc;
 ```
-Boom flag.
 
 # Footprinting Lab3 Hard
 
-Enumerate the server carefully and find the username "HTB" and its password. Then, submit HTB's password as the answer.
+Enumerate the server carefully, recover the **HTB** account password, and submit it as the lab answer.
     onesixtyone -c /opt/useful/SecLists/Discovery/SNMP/snmp.txt 10.129.147.148
 	    #backup
 	    #commnity is backup

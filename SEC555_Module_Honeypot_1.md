@@ -1,94 +1,185 @@
-Create honeypot
-configure the honeypot via define the login user in userdb.txt 
+# SEC555 — Cowrie honeypot and Wazuh enrichment (lab notes)
+
+Structured notes for deploying **Cowrie** (SSH honeypot), capturing sessions, and optional **AbuseIPDB** enrichment in **Wazuh**. Replace all IPs, API keys, and SSH public keys with your own lab values.
+
+---
+
+## 1. Honeypot configuration (Cowrie)
+
+### `userdb.txt` (example)
+
+Define credentials the honeypot will accept (intentionally weak for capture-only labs):
+
+```text
 root:x:rootpasswrd
-configure the presented versions via cowrie.cfg
-user control+w to quickly find terms in the file, change the SSH version ect.
-
-Use Kali to scan down host/enumerate. 
-```bash
-nmap -sV -sC  192.168.29.133   
 ```
 
-User hydra to get the username password to break into SSH
-```bash 
-hydra -l root  -P  /home/kali/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords.txt  ssh://192.168.29.133:2222
-```
-SSH into the host with the found password
+| Field | Meaning |
+|-------|---------|
+| `root` | Login name presented to attackers |
+| `x` | Password field placeholder in Cowrie userdb format |
+| `rootpasswrd` | Cleartext password Cowrie will accept |
+
+### `cowrie.cfg`
+
+- Set **SSH banner / software version** strings to mimic desired targets.
+- Use your editor’s search (**Ctrl+W** in `nano`) to jump to `ssh_version`, `hostname`, and listen **port** (often **2222** mapped from Docker).
+
+**QC:** Never reuse production passwords; isolate the honeypot on a lab VLAN.
+
+---
+
+## 2. Enumeration from Kali
+
+**Service scan against the honeypot IP:**
+
 ```bash
-ssh root@192.168.29.133 -p 2222  
+nmap -sV -sC 192.168.29.133
 ```
-Remove SSH keys and only allow our own while logged into remote host
+
+| Flag | Purpose |
+|------|---------|
+| `-sV` | Version detection |
+| `-sC` | Default scripts (often shows SSH banner quirks) |
+
+---
+
+## 3. Brute-force SSH (lab exercise)
+
+**Hydra** against the honeypot SSH port (here **2222**):
+
 ```bash
-rm -rf .ssh
-mkdir ~/.ssh
+hydra -l root -P /home/kali/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords.txt ssh://192.168.29.133:2222
+```
+
+| Flag | Purpose |
+|------|---------|
+| `-l root` | Single username |
+| `-P` | Password wordlist path |
+| `ssh://IP:PORT` | Target service URL form |
+
+**QC:** Use a **truncated** wordlist in class demos; full multi-million lists are noisy and slow.
+
+---
+
+## 4. SSH login (after password found)
+
+```bash
+ssh root@192.168.29.133 -p 2222
+```
+
+---
+
+## 5. Attacker SSH key pinning (lab scenario)
+
+The exercise may require **replacing** `authorized_keys` so only your analyst key is trusted:
+
+```bash
+rm -rf ~/.ssh
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
 touch ~/.ssh/authorized_keys
-cd ./.ssh
-echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCi2sGL3y7CI8VUJP57PMHOhRfkChy725Jnlg/FP/TlxEHIypywakF9HLkL95rB3aKtHrIkq/nlJuswqPqQGJLYky58jag7Pc9uoeSfgRup15vYWMZfSF08ghAjIGXyleRyjGivt+z8/zVDteHUfOYh3SyaRz7Ul8ZKJSGlZ7/ux3yvVttLCCPE9yN8Dv0lFidnO5HuvFNfyqFDRhM9IzUC59+WIfscoX7zCwPVz749j7w4ZdfB/L/kBngZEAc9pqJK48ppbxsQTMImKtxVOLX/loZboPlO8va6oSsJJsnl5TgXkEqIaEXOm3kx7ZlohA246v/CgqTA+1rGpRt7F+Yr3u1CiczOuvRAelZM5s9UkPoXHZgU8R9HGTOiWePrmrv2yvDMbdi2Py8LfN6mehnQqAmmxo3OFky5YDQowdv0eY36Hko5Tm1bRzOLUqfZ62u/dO/yS/Z6RFpxsMuINGApjA0nRLxq+9TuwCVPMW/G8oD7mlaoI5xH+BDKG+N6IJM=">>./authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Append **your** public key (one line, `ssh-rsa` / `ssh-ed25519` …):
+
+```bash
+echo "ssh-ed25519 AAAA...your-key-here... analyst@lab" >> ~/.ssh/authorized_keys
+```
+
+**QC:** The course material originally embedded a long RSA key—**rotate** any key that was ever pasted into coursework. Never paste production private keys into notes.
+
+Clear shell history if the rubric requires it:
+
+```bash
 history -c
 exit
 ```
-In honey pot find most recent connection and go replay the attack 
-```bash 
+
+---
+
+## 6. Replay captured TTY logs (Cowrie)
+
+Recorded sessions live under Cowrie’s data directory, for example:
+
+```bash
 cd /home/cowrie/cowrie/var/lib/cowrie/tty
-ls -l
-ls -ltR --time-style=+"%Y-%m-%d %T" ./ | grep -v '^d' | sort -k6,7 | cut -d' ' -f6-
-cd /home/cowrie/cowrie/var/lib/cowrie/tty
-python3 /home/cowrie/cowrie/bin/playlog ./c823f67fc615fba20a757442184b23c5eb23cd1159e4a36c007554ddc95c16e8
+ls -lt
 ```
-Create enrichment with abuseipdb for Wazuh agent.
-Made account
-copy api key
-added integration for abuseip to wazuh integrations
-made logs on the linux ssh sever for a test ip out of the abuse ip list 
-saw them trigger with api lookup
-added logic for confidence score above 70% see workbook for more 
-Restart Wazuh
+
+**Play back** a specific session log:
+
 ```bash
-systemctl status wazuh-manager
+python3 /home/cowrie/cowrie/bin/playlog ./<SESSION_LOG_FILENAME>
 ```
-Check Wazuh status
+
+Replace `<SESSION_LOG_FILENAME>` with the artifact Cowrie created (long hex name).
+
+---
+
+## 7. Wazuh — AbuseIPDB integration (outline)
+
+1. Create an **AbuseIPDB** account and API key (free tier for labs).
+2. Install helper script with correct ownership:
+
 ```bash
-systemctl status wazuh-dashboard
-systemctl status wazuh-indexer
+sudo chmod 755 /var/ossec/integrations/custom-abuseipdb.py
+sudo chown root:wazuh /var/ossec/integrations/custom-abuseipdb.py
 ```
-list integrations
-```bash
-ls -l /var/ossec/integrations
-```
-view alerts 
-```bash
-ls /var/ossec/logs/alerts/
-```
-look at rule files
-```bash
-ls /var/ossec/ruleset/rules/ | grep vsftpd
-```
-Install and launch ssh server on linux host
-```bash 
-sudo su
-sudo apt-get update
-apt install openssh-server
-systemctl start ssh
-```
-Enabled abuseipdb integration in wazuh
-```bash
-chmod 755 /var/ossec/integrations/custom-abuseipdb.py
-chown root:wazuh /var/ossec/integrations/custom-abuseipdb.py
-```
-Add integration and api key into wazuh conf
-```bash
-nano /var/ossec/etc/ossec.conf
-<!-- Abuse IPDB Integration -->
+
+3. Edit **`/var/ossec/etc/ossec.conf`** and add an `<integration>` block (use **environment variables** or a **restricted** config template—avoid committing real API keys to git):
+
+```xml
+<!-- AbuseIPDB integration (example — use YOUR key) -->
 <integration>
-<name>custom-abuseipdb.py</name>
-<hook_url>https://api.abuseipdb.com/api/v2/check</hook_url>
-<api_key>YOUR_ABUSEIPDB_API_KEY</api_key>
-<level>10</level>
-<rule_id>100002</rule_id>
-<alert_format>json</alert_format>
+  <name>custom-abuseipdb.py</name>
+  <hook_url>https://api.abuseipdb.com/api/v2/check</hook_url>
+  <api_key>YOUR_ABUSEIPDB_API_KEY</api_key>
+  <level>10</level>
+  <rule_id>100002</rule_id>
+  <alert_format>json</alert_format>
 </integration>
 ```
-review integration activity
+
+4. Tail integration logs:
+
 ```bash
-tail -f /var/ossec/logs/integrations.log
+sudo tail -f /var/ossec/logs/integrations.log
 ```
+
+5. Check manager / stack health:
+
+```bash
+sudo systemctl status wazuh-manager
+sudo systemctl status wazuh-dashboard
+sudo systemctl status wazuh-indexer
+```
+
+6. List custom integrations and sample rules:
+
+```bash
+ls -l /var/ossec/integrations
+ls /var/ossec/logs/alerts/
+ls /var/ossec/ruleset/rules/ | grep vsftpd
+```
+
+---
+
+## 8. Optional — SSH server on Linux test host
+
+```bash
+sudo apt-get update
+sudo apt-get install -y openssh-server
+sudo systemctl start ssh
+```
+
+Use only on **isolated** lab networks.
+
+---
+
+## QC checklist
+
+- [ ] All IPs and API keys are **placeholders** or redacted for sharing.
+- [ ] Cowrie listens on a **non-standard** port and is **firewalled** from production.
+- [ ] Wazuh integration tested with a **known benign** IP before blocking automation runs.

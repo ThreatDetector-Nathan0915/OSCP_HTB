@@ -3,7 +3,7 @@
 
 ---
 
-## 💻 PowerShell and WMI Enumeration
+## PowerShell and WMI Enumeration
 
 ```powershell
 Get-WmiObject -Class win32_OperatingSystem | select Version,BuildNumber
@@ -32,7 +32,7 @@ Get-WmiObject -Class Win32_Service -ComputerName <remote_ip>
 
 ---
 
-## 🌐 RDP (Remote Desktop Protocol)
+## RDP (Remote Desktop Protocol)
 
 ```bash
 xfreerdp /v:<targetIp> /u:htb-student /p:Academy_WinFun!
@@ -47,7 +47,7 @@ Breakdown:
 
 ---
 
-## 🗂️ File System Structure and Navigation
+## File System Structure and Navigation
 
 ```cmd
 dir c:\ /a
@@ -78,7 +78,7 @@ tree c:\ /f | more
 
 ---
 
-## 🔐 NTFS Permissions
+## NTFS Permissions
 
 ```cmd
 icacls c:\windows
@@ -124,7 +124,7 @@ icacls c:\users /remove joe
 
 ---
 
-## 📡 SMB & Share Permissions
+## SMB & Share Permissions
 
 ```bash
 smbclient -L SERVER_IP -U htb-student
@@ -148,7 +148,7 @@ sudo apt-get install cifs-utils
 
 ---
 
-## 🪟 Windows GUI Tools
+## Windows GUI Tools
 
 ### Computer Management
 ```bash
@@ -164,7 +164,7 @@ eventvwr.msc
 
 ---
 
-## 📌 Summary
+## Summary
 
 - Use `Get-WmiObject` to query system info.
 - `xfreerdp` for RDP login with username/password.
@@ -173,18 +173,18 @@ eventvwr.msc
 - NTFS + Share permissions both matter – most restrictive applies.
 
 
-# 🔐 NTFS vs. Share Permissions (HTB Windows Fundamentals)
+# NTFS vs. Share Permissions (HTB Windows Fundamentals)
 
-## 🔄 Understanding SMB and NTFS Permission Layers
+## Understanding SMB and NTFS Permission Layers
 
-### 🎯 Target
+### Target
 Target IP: `10.129.201.57`  
 RDP Username: `htb-student`  
 RDP Password: `Academy_WinFun!`
 
 ---
 
-## 🔗 What is SMB?
+## What is SMB?
 **SMB (Server Message Block)** is the Windows protocol used to share resources like:
 - Files
 - Folders
@@ -192,7 +192,7 @@ RDP Password: `Academy_WinFun!`
 
 ---
 
-## 🔧 Share Permissions (via GUI)
+## Share Permissions (via GUI)
 | Permission    | Description                                                                 |
 |---------------|-----------------------------------------------------------------------------|
 | Full Control  | Can change permissions and perform all actions                              |
@@ -201,7 +201,7 @@ RDP Password: `Academy_WinFun!`
 
 ---
 
-## 🔒 NTFS Permissions
+## NTFS Permissions
 | Permission         | Description                                                            |
 |--------------------|------------------------------------------------------------------------|
 | Full Control       | Add/edit/delete files & folders, change NTFS perms                     |
@@ -214,7 +214,7 @@ RDP Password: `Academy_WinFun!`
 
 ---
 
-## 🧱 NTFS Inheritance
+## NTFS Inheritance
 By default, NTFS permissions are **inherited** from parent directories (e.g., `C:\`).
 
 Can be disabled via:
@@ -222,7 +222,7 @@ Can be disabled via:
 
 ---
 
-## 💻 Creating the Shared Folder
+## Creating the Shared Folder
 1. Create new folder on Desktop: `Company Data`
 2. Right-click → Properties → Sharing → Advanced Sharing
 3. Check **"Share this folder"**
@@ -231,27 +231,27 @@ Can be disabled via:
 
 ---
 
-## 📡 Accessing Shares Remotely (from Pwnbox)
-### 🔍 Listing shares:
+## Accessing Shares Remotely (from Pwnbox)
+### Listing shares:
 ```bash
 smbclient -L 10.129.201.57 -U htb-student
 ```
 
-### 🔗 Connect to share:
+### Connect to share:
 ```bash
 smbclient '\\\\10.129.201.57\\Company Data' -U htb-student
 ```
 
 ---
 
-## 🧱 What blocks access? Windows Defender Firewall!
+## What blocks access? Windows Defender Firewall!
 Disable firewall or allow inbound SMB via:
 - Control Panel → Windows Defender Firewall → Advanced Settings
 - Enable: **File and Printer Sharing (SMB-In)** for Public profile
 
 ---
 
-## 📂 Mounting SMB Share to Linux
+## Mounting SMB Share to Linux
 ```bash
 sudo mount -t cifs -o username=htb-student,password=Academy_WinFun! //10.129.201.57/"Company Data" /home/kali/Desktop/
 ```
@@ -263,7 +263,7 @@ sudo apt-get install cifs-utils
 
 ---
 
-## 🧰 Auditing Shares (from within Windows)
+## Auditing Shares (from within Windows)
 
 ### View shares
 ```cmd
@@ -271,7 +271,7 @@ net share
 ```
 
 ### Sample Output
-```
+```text
 Share name   Resource                          Remark
 ---------------------------------------------------------------
 C$           C:\                               Default share
@@ -282,29 +282,29 @@ Company Data C:\Users\htb-student\Desktop\Company Data
 
 ---
 
-## 📊 View Logs of Share Access
+## View Logs of Share Access
 
 ### Open Event Viewer:
-```
+```text
 eventvwr.msc
 ```
 
 Navigate to:
-```
+```text
 Windows Logs > Security > Event ID 5059
 ```
 
 ---
 
-# 🧠 Windows Services & Processes (Page 5)
+# Windows Services & Processes (Page 5)
 
-## 🔎 Check Running Services (PowerShell)
+## Check Running Services (PowerShell)
 ```powershell
 Get-Service | ? {$_.Status -eq "Running"} | Select -First 5 | Format-List
 ```
 
 Sample Output:
-```
+```text
 Name                : AdobeARMservice
 DisplayName         : Adobe Acrobat Update Service
 Status              : Running
@@ -313,7 +313,7 @@ Status              : Running
 
 ---
 
-## 🧵 Critical Windows Processes (do not terminate!)
+## Critical Windows Processes (do not terminate!)
 | Process         | Description                                           |
 |------------------|-------------------------------------------------------|
 | smss.exe         | Session Manager                                       |
@@ -325,7 +325,7 @@ Status              : Running
 
 ---
 
-## 🧰 Using Sysinternals Tools (no download needed)
+## Using Sysinternals Tools (no download needed)
 
 Run tool from remote:
 ```cmd
@@ -341,7 +341,7 @@ Useful tools:
 
 ---
 
-## 🛠️ Task Manager Tabs Breakdown
+## Task Manager Tabs Breakdown
 
 | Tab             | Info Provided |
 |-----------------|----------------|
@@ -353,7 +353,7 @@ Useful tools:
 | Details         | PID, username, CPU/mem |
 | Services        | List of services |
 
-## ✅ Summary:
+## Summary:
 - NTFS and Share permissions combine!
 - Use `smbclient` or mount SMB shares to test access
 - Use `net share`, `eventvwr.msc`, and `services.msc` for auditing
@@ -361,11 +361,11 @@ Useful tools:
 
 # HTB Academy – Windows Fundamentals (Pages 6-8)
 
-## 🔐 Windows Service Permissions
+## Windows Service Permissions
 
 Windows services are long-running processes that are essential for OS operation. Misconfigurations in service permissions can lead to privilege escalation or persistent malware execution.
 
-### 🔧 Examining Services via `services.msc`
+### Examining Services via `services.msc`
 This GUI utility allows you to inspect:
 
 - Service name (used in CLI tools)
@@ -373,7 +373,7 @@ This GUI utility allows you to inspect:
 - Logon options (`LocalSystem`, custom service accounts)
 - Recovery options (e.g., run a program on failure)
 
-### 🔍 Examining Services with `sc`
+### Examining Services with `sc`
 
 ```cmd
 sc qc wuauserv
@@ -400,7 +400,7 @@ sc sdshow wuauserv
 ```
 > Dumps the security descriptor in SDDL format.
 
-### 🔍 PowerShell: View Service Permissions via Registry
+### PowerShell: View Service Permissions via Registry
 
 ```powershell
 Get-Acl -Path HKLM:\System\CurrentControlSet\Services\wuauserv | Format-List
@@ -415,13 +415,13 @@ This shows:
 
 ---
 
-## 🧑‍💻 Windows Sessions
+## Windows Sessions
 
-### ✅ Interactive (Local or RDP Logons)
+### Interactive (Local or RDP Logons)
 - User authenticates via keyboard login or RDP
 - Initiates an interactive session
 
-### ❌ Non-Interactive
+### Non-Interactive
 Run services & tasks *without* login. These accounts include:
 
 | Account | Description |
@@ -432,19 +432,19 @@ Run services & tasks *without* login. These accounts include:
 
 ---
 
-## 🖱️ Interacting with Windows
+## Interacting with Windows
 
-### 🪟 GUI (Graphical User Interface)
+### GUI (Graphical User Interface)
 - Introduced to ease usability
 - Used by sysadmins for managing AD, IIS, DBs, etc.
 
-### 🔌 RDP (Remote Desktop Protocol)
+### RDP (Remote Desktop Protocol)
 - GUI over network on TCP 3389
 - Admins use this to manage systems remotely
 
 ---
 
-## 🖥️ Windows Command Line (CMD)
+## Windows Command Line (CMD)
 
 ### Run CMD
 
@@ -466,18 +466,18 @@ Displays usage & arguments of command.
 
 ---
 
-## 💪 Windows PowerShell
+## Windows PowerShell
 
 PowerShell is built on .NET and includes advanced scripting capabilities and cmdlets.
 
-### 📜 Cmdlets: Verb-Noun pattern
+### Cmdlets: Verb-Noun pattern
 
 ```powershell
 Get-ChildItem -Recurse
 Get-ChildItem -Path C:\Users\Administrator\Downloads -Recurse
 ```
 
-### 🔁 Aliases
+### Aliases
 
 ```powershell
 Get-Alias
@@ -485,7 +485,7 @@ Get-Alias -Name "cd"
 New-Alias -Name "Show-Files" Get-ChildItem
 ```
 
-### 📚 Help System
+### Help System
 
 ```powershell
 help
@@ -496,7 +496,7 @@ Update-Help
 
 ---
 
-## ⚙️ Running PowerShell Scripts
+## Running PowerShell Scripts
 
 ```powershell
 .\PowerView.ps1; Get-LocalGroup | fl
@@ -506,7 +506,7 @@ Get-Module | select Name,ExportedCommands | fl
 
 ---
 
-## 🔒 Execution Policies
+## Execution Policies
 
 | Policy | Description |
 |--------|-------------|
@@ -536,10 +536,10 @@ Confirm policy change:
 
 ---
 
-## ✅ Module Quiz Answers
+## Module Quiz Answers
 
-- ❓ **Alias for ipconfig.exe**: `ifconfig`
-- ❓ **Execution Policy (LocalMachine)**: `Unrestricted`
+-  **Alias for ipconfig.exe**: `ifconfig`
+-  **Execution Policy (LocalMachine)**: `Unrestricted`
 # Windows Fundamentals – Part 4: Windows Management Instrumentation (WMI)
 
 ## WMI Overview
@@ -620,7 +620,7 @@ PS C:\htb> Get-WmiObject -Class Win32_OperatingSystem | select SystemDirectory,B
 
 **Output:**
 
-```
+```text
 SystemDirectory     BuildNumber SerialNumber            Version
 ---------------     ----------- ------------            -------
 C:\Windows\system32 19041       00123-00123-00123-AAOEM 10.0.19041
@@ -638,7 +638,7 @@ PS C:\htb> Invoke-WmiMethod -Path "CIM_DataFile.Name='C:\users\public\spns.csv'"
 
 **Output:**
 
-```
+```text
 ReturnValue : 0
 ```
 
@@ -657,7 +657,7 @@ Get-WmiObject -Class Win32_BIOS | Select-Object SerialNumber
 ```
 
 Use this to answer:  
-🟢 “Use WMI to find the serial number of the system.”
+ “Use WMI to find the serial number of the system.”
 
 ---
 
